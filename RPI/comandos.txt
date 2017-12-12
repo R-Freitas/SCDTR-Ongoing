@@ -1,0 +1,1 @@
+C:\SysGCC\Raspberry\bin\arm-linux-gnueabihf-g++.exe -ggdb test.cpp -o test
