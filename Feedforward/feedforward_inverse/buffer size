@@ -1,0 +1,5 @@
+Ts = 0.03 [s/sample]
+1min buffer size = 60/0.03 = 2000 [samples]
+sample size (float) = 4 [Bytes/sample]
+
+memory needed per buffer = 2000*4 = 8 [kBytes]
