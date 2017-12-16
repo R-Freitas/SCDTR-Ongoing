@@ -52,10 +52,10 @@ void feedforwardConsensus(float (&d) [N_ELEMENTS],
                           arduino_info (&elements) [N_ELEMENTS],
                           float &rho){
 
-    // ---------------------------------------------------------------------- //
+    // ###################################################################### //    <-- Code between these lines has been tested, adn is working
     //                  1) Compute unconstrained solution
     // ---------------------------------------------------------------------- //
-	
+
 	float z[N_ELEMENTS];
     float d_unconstrained[N_ELEMENTS];
     for(int i=0; i<N_ELEMENTS; i++){
@@ -68,29 +68,28 @@ void feedforwardConsensus(float (&d) [N_ELEMENTS],
             d_unconstrained[i] = z[i]/(Q[i]+rho);
         }
 	}
-	// ---------------------------  DEBUG  ------------------------------ //
-		float f;
-		f = 0.5*Q[my_index]*d_unconstrained[my_index]*d_unconstrained[my_index]
-		  + c[my_index]*d_unconstrained[my_index];
-		for(int j=0; j<N_ELEMENTS; j+=2){
-			for(int i=0; i<N_ELEMENTS; i++){
-				f += y[i]*(d_unconstrained[i]-d_av[i])
-				   + 0.5*rho*(d_unconstrained[i]-d_av[i])*(d_unconstrained[i]-d_av[i]);
-				Serial.println(d_unconstrained[j]);
-				Serial.println(d_unconstrained[j+1]);
-				Serial.println(f);
-				Serial.println(" ");
-			}
-	   }  
+
+	// -----------------------------  DEBUG  -------------------------------- //
+		// float f;
+		// f = 0.5*Q[my_index]*d_unconstrained[my_index]*d_unconstrained[my_index]
+		//   + c[my_index]*d_unconstrained[my_index];
+		// for(int j=0; j<N_ELEMENTS; j+=2){
+		// 	for(int i=0; i<N_ELEMENTS; i++){
+		// 		f += y[i]*(d_unconstrained[i]-d_av[i])
+		// 		   + 0.5*rho*(d_unconstrained[i]-d_av[i])*(d_unconstrained[i]-d_av[i]);
+		// 		Serial.println(d_unconstrained[j]);
+		// 		Serial.println(d_unconstrained[j+1]);
+		// 		Serial.println(f);
+		// 		Serial.println(" ");
+		// 	}
+	   // }
     // ---------------------------------------------------------------------- //
 
-
-	
     // ------------------- Check solution feasibility ----------------------- //
 
-    float L_unconstrained = 0; // unconstrained illuminance at local desk
+    float L_unconstrained = o[my_index];    // unconstrained illuminance at local desk
     for(int i=0; i<N_ELEMENTS; i++){
-        L_unconstrained += elements[i].ganho;
+        L_unconstrained += (elements[i].ganho)*d_unconstrained[i];
     }
     if ((d_unconstrained[my_index]>=0) &&
         (d_unconstrained[my_index]<=255) &&
@@ -101,6 +100,7 @@ void feedforwardConsensus(float (&d) [N_ELEMENTS],
         }
     }
 
+    // ###################################################################### //    <-- Code between these lines has been tested, adn is working
 
     // ---------------------------------------------------------------------- //
     //                  2) Compute best solution on the boundary
@@ -114,17 +114,17 @@ void feedforwardConsensus(float (&d) [N_ELEMENTS],
     int sol_linear_dcmax;
 
     //Current best cost function / duty cycle values
-	// float f;
-    // float f_best = 100000;
-    // float d_best[N_ELEMENTS];
+	float f;
+    float f_best = 100000;
+    float d_best[N_ELEMENTS];
 
     //Local cost function computation
-	// f = Q[my_index]*d_best[my_index]*d_best[my_index]
-	  // + c[my_index]*d_best[my_index];
-	// for(int i=0; i<N_ELEMENTS; i++){
-        // f += y[i]*(d_best[i]-d_av[i])
-           // + 0.5*rho*(d_best[i]-d_av[i])*(d_best[i]-d_av[i]);
-    // }
+	f = Q[my_index]*d_best[my_index]*d_best[my_index]
+	  + c[my_index]*d_best[my_index];
+	for(int i=0; i<N_ELEMENTS; i++){
+        f += y[i]*(d_best[i]-d_av[i])
+           + 0.5*rho*(d_best[i]-d_av[i])*(d_best[i]-d_av[i]);
+    }
     return;
 }
 
