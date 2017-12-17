@@ -177,39 +177,48 @@ for i=1:5,
            min_best_1(i) = min_linear_0;
        end;
    end;
-   % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-   % % compute minimum constrained to linear and 100 boundary
-   % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-   % common = (rho+q1)/((rho+q1)*n-k11*k11);
-   % det1 = common;
-   % det2 = k11*common;
-   % det3 = det2;
-   % det4 = n*(rho+q1)*common;
-   % x1 = det1*w1 + det2*w3;
-   % x2 = det3*w1 + det4*w3;
-   % v1 = det1*u1 + det2*u3; 
-   % v2 = det3*u1 + det4*u3; 
-   % d11l100 = p11*z11+p11*k11*(x1-v1)-p11*(x2-v2);
-   % d12l100 = p12*z12+p12*k12*(x1-v1);
-   % %check feasibility
-   % if (d11l100 < 0), sol_linear_100 = 0; end;
-   % % compute function value and if best store new optimum
-   % if sol_linear_100, 
-        % min_linear_100 = 0.5*q1*d11l100^2 + c1*d11l100 + y1(1)*(d11l100-d1_av(1)) + ...
-           % y1(2)*(d12l100-d1_av(2)) + rho/2*(d11l100-d1_av(1))^2 + rho/2*(d12l100-d1_av(2))^2;
-       % if min_linear_100 < min_best_1(i),
-           % d11_best = d11u;
-           % d12_best = d12u;
-           % min_best_1_(i) = min_linear100;
-       % end;
+   
+   %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   % compute minimum constrained to linear and 100 boundary
+   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   common = (rho+q1)/((rho+q1)*n-k11*k11);
+   det1 = common;
+   det2 = k11*common;
+   det3 = det2;
+   det4 = n*(rho+q1)*common;
+   x1 = det1*w1 + det2*w3;
+   x2 = det3*w1 + det4*w3;
+   v1 = det1*u1 + det2*u3; 
+   v2 = det3*u1 + det4*u3; 
+   d11l100 = p11*z11+p11*k11*(x1-v1)-p11*(x2-v2);
+   d12l100 = p12*z12+p12*k12*(x1-v1);
+   buffer_l100(1,i) = d11l100;
+   buffer_l100(2,i) = d12l100;
+   %check feasibility
+   if (d11l100 < 0), sol_linear_100 = 0; end;
+   % compute function value and if best store new optimum
+   if sol_linear_100, 
+        min_linear_100 = 0.5*q1*d11l100^2 + c1*d11l100 + y1(1)*(d11l100-d1_av(1)) + ...
+           y1(2)*(d12l100-d1_av(2)) + rho/2*(d11l100-d1_av(1))^2 + rho/2*(d12l100-d1_av(2))^2;
+       buffer_l100(3,i) = min_linear_100;      
+       if min_linear_100 < min_best_1(i),
+           d11_best = d11u;
+           d12_best = d12u;
+           min_best_1_(i) = min_linear100;
+       end;
     end;
+    
+    %% Print buffers
+    
     buffer_u
     buffer_l
     buffer_b0
     buffer_b100
     buffer_l0
-    
-   % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    buffer_l100
+
+end    
+   %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    % %store data and save for next cycle
    % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    % best_d11(i) = d11_best;
