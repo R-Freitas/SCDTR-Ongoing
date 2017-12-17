@@ -80,8 +80,8 @@ for i=1:5,
    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    %    compute minimum constrained to linear boundary   
    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-   d11bl = p11*z11+p11*(w1-u1)*k11/n;
-   d12bl = p12*z12+p12*(w1-u1)*k12/n;
+   d11bl = p11*z11+p11*k11/n*(w1-u1);
+   d12bl = p12*z12+p12*k12/n*(w1-u1);  
    buffer_l(1,i) = d11bl;
    buffer_l(2,i) = d12bl;
    %check feasibility of minimum constrained to linear boundary

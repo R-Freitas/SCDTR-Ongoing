@@ -87,12 +87,12 @@ void feedforwardConsensus(float (&K) [N_ELEMENTS][N_ELEMENTS],
 
     // ---------------------- DEBUG (unconstrained)  ------------------------ //
     //
-    float f_unconstrained = cost_function(d_unconstrained, c, Q, y, d_av, rho);
-    for(int i=0; i<N_ELEMENTS; i++){
-        Serial.println(d_unconstrained[i]);
-    }
-    Serial.println(f_unconstrained);
-    Serial.println(" ");
+    // float f_unconstrained = cost_function(d_unconstrained, c, Q, y, d_av, rho);
+    // for(int i=0; i<N_ELEMENTS; i++){
+    //     Serial.println(d_unconstrained[i]);
+    // }
+    // Serial.println(f_unconstrained);
+    // Serial.println(" ");
 
     // ---------------------------------------------------------------------- //
 
@@ -131,10 +131,12 @@ void feedforwardConsensus(float (&K) [N_ELEMENTS][N_ELEMENTS],
     float d_linear[N_ELEMENTS];
     for(int i=0; i<N_ELEMENTS; i++){
         if(i!=my_index){
-            d_linear[i] = (z[i]/rho) - (elements[i].ganho)*(o[i]-Lref[i]-w1)/(n*rho);
+            d_linear[i] = z[i]/rho
+                        - (elements[i].ganho)*(o[my_index]-Lref[my_index]-w1)/(n*rho);
         }
         else if(i==my_index){
-            d_linear[i] = (z[i]/(Q[i]+rho)) - (elements[i].ganho)*(o[i]-Lref[i]-w1)/(n*(Q[i]+rho));
+            d_linear[i] = z[i]/(Q[i]+rho)
+                        - (elements[i].ganho)*(o[my_index]-Lref[my_index]-w1)/(n*(Q[i]+rho));
         }
 	}
 
@@ -156,12 +158,13 @@ void feedforwardConsensus(float (&K) [N_ELEMENTS][N_ELEMENTS],
 
     // ------------------------  DEBUG (linear)  ---------------------------- //
     //
-    f_linear = cost_function(d_linear, c, Q, y, d_av, rho);
-    for(int i=0; i<N_ELEMENTS; i++){
-        Serial.println(d_linear[i]);
-    }
-    Serial.println(f_linear);
-    Serial.println(" ");
+    // f_linear = cost_function(d_linear, c, Q, y, d_av, rho);
+    // for(int i=0; i<N_ELEMENTS; i++){
+    //     Serial.println(d_linear[i]);
+    // }
+    // Serial.println(f_linear);
+    // Serial.println(" ");
+
 
     return;
 }
