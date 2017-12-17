@@ -135,6 +135,7 @@ for i=1:5,
    if (d11b0 < 0), sol_boundary_100 = 0; end;
    if (k11*d11b100 + k12*d12b100 < L1-o1), sol_boundary_100 = 0; end;
    % compute function value and if best store new optimum
+   sol_boundary_100 = 1;
    if sol_boundary_100, 
         min_boundary_100 = 0.5*q1*d11b100^2 + c1*d11b100 + y1(1)*(d11b100-d1_av(1)) + ...
            y1(2)*(d12b100-d1_av(2)) + rho/2*(d11b100-d1_av(1))^2 + rho/2*(d12b100-d1_av(2))^2;
@@ -145,32 +146,37 @@ for i=1:5,
            min_best_1(i) = min_boundary_100;
        end;
    end;
-   % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-   % % compute minimum constrained to linear and zero boundary
-   % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-   % common = (rho+q1)/((rho+q1)*n-k11*k11);
-   % det1 = common;
-   % det2 = -k11*common;
-   % det3 = det2;
-   % det4 = n*(rho+q1)*common;
-   % x1 = det1*w1 + det2*w2;
-   % x2 = det3*w1 + det4*w2;
-   % v1 = det1*u1 + det2*u2; %u2 = 0 so this can be simplified
-   % v2 = det3*u1 + det4*u2; %u2 = 0 so this can be simplified
-   % d11l0 = p11*z11+p11*k11*(x1-v1)+p11*(x2-v2);
-   % d12l0 = p12*z12+p12*k12*(x1-v1);
-   % %check feasibility
-   % if (d11l0 > 100), sol_linear_0 = 0; end;
-   % % compute function value and if best store new optimum
-   % if sol_linear_0, 
-        % min_linear_0 = 0.5*q1*d11l0^2 + c1*d11l0 + y1(1)*(d11l0-d1_av(1)) + ...
-           % y1(2)*(d12l0-d1_av(2)) + rho/2*(d11l0-d1_av(1))^2 + rho/2*(d12l0-d1_av(2))^2;
-       % if min_linear_0 < min_best_1(i),
-           % d11_best = d11l0;
-           % d12_best = d12l0;
-           % min_best_1(i) = min_linear_0;
-       % end;
-   % end;
+   
+   %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   % compute minimum constrained to linear and zero boundary
+   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   common = (rho+q1)/((rho+q1)*n-k11*k11);
+   det1 = common;
+   det2 = -k11*common;
+   det3 = det2;
+   det4 = n*(rho+q1)*common;
+   x1 = det1*w1 + det2*w2;
+   x2 = det3*w1 + det4*w2;
+   v1 = det1*u1 + det2*u2; %u2 = 0 so this can be simplified
+   v2 = det3*u1 + det4*u2; %u2 = 0 so this can be simplified
+   d11l0 = z11/(rho+q1) + p11*k11*(x1-v1) + p11*(x2-v2);
+   d12l0 = z12/rho      + p12*k12*(x1-v1);
+   buffer_l0(1,i) = d11l0;
+   buffer_l0(2,i) = d12l0;
+      %check feasibility
+   if (d11l0 > 100), sol_linear_0 = 0; end;
+   % compute function value and if best store new optimum
+   sol_linear_0 = 1;
+   if sol_linear_0, 
+        min_linear_0 = 0.5*q1*d11l0^2 + c1*d11l0 + y1(1)*(d11l0-d1_av(1)) + ...
+           y1(2)*(d12l0-d1_av(2)) + rho/2*(d11l0-d1_av(1))^2 + rho/2*(d12l0-d1_av(2))^2;
+       buffer_l0(3,i) = min_linear_0;
+       if min_linear_0 < min_best_1(i),
+           d11_best = d11l0;
+           d12_best = d12l0;
+           min_best_1(i) = min_linear_0;
+       end;
+   end;
    % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    % % compute minimum constrained to linear and 100 boundary
    % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -201,6 +207,8 @@ for i=1:5,
     buffer_l
     buffer_b0
     buffer_b100
+    buffer_l0
+    
    % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    % %store data and save for next cycle
    % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

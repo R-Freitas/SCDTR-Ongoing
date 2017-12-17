@@ -87,12 +87,12 @@ void feedforwardConsensus(float (&K) [N_ELEMENTS][N_ELEMENTS],
 
     // ---------------------- DEBUG (unconstrained)  ------------------------ //
     //
-    // float f_unconstrained = cost_function(d_unconstrained, c, Q, y, d_av, rho);
-    // for(int i=0; i<N_ELEMENTS; i++){
-    //     Serial.println(d_unconstrained[i]);
-    // }
-    // Serial.println(f_unconstrained);
-    // Serial.println(" ");
+    float f_unconstrained = cost_function(d_unconstrained, c, Q, y, d_av, rho);
+    for(int i=0; i<N_ELEMENTS; i++){
+        Serial.println(d_unconstrained[i]);
+    }
+    Serial.println(f_unconstrained);
+    Serial.println(" ");
     //
     // ---------------------------------------------------------------------- //
 
@@ -129,12 +129,10 @@ void feedforwardConsensus(float (&K) [N_ELEMENTS][N_ELEMENTS],
     float d_linear[N_ELEMENTS];
     for(int i=0; i<N_ELEMENTS; i++){
         if(i!=my_index){
-            d_linear[i] = z[i]/rho
-                        - (elements[i].ganho)*(o[my_index]-Lref[my_index]-w1)/(n*rho);
+            d_linear[i] = z[i]/rho - (elements[i].ganho)*(o[my_index]-Lref[my_index]-w1)/(n*rho);
         }
         else if(i==my_index){
-            d_linear[i] = z[i]/(Q[i]+rho)
-                        - (elements[i].ganho)*(o[my_index]-Lref[my_index]-w1)/(n*(Q[i]+rho));
+            d_linear[i] = z[i]/(Q[i]+rho) - (elements[i].ganho)*(o[my_index]-Lref[my_index]-w1)/(n*(Q[i]+rho));
         }
 	}
 
@@ -145,6 +143,7 @@ void feedforwardConsensus(float (&K) [N_ELEMENTS][N_ELEMENTS],
         (d_linear[my_index]<=100)){
         f_linear = cost_function(d_linear, c, Q, y, d_av, rho);
         if(f_linear<f_best){
+            f_best = f_linear;
             for(int i=0; i<N_ELEMENTS; i++){
                 d_best[i] = d_linear[i];
             }
@@ -153,12 +152,12 @@ void feedforwardConsensus(float (&K) [N_ELEMENTS][N_ELEMENTS],
 
     // ------------------------  DEBUG (linear)  ---------------------------- //
     //
-    // f_linear = cost_function(d_linear, c, Q, y, d_av, rho);
-    // for(int i=0; i<N_ELEMENTS; i++){
-    //     Serial.println(d_linear[i]);
-    // }
-    // Serial.println(f_linear);
-    // Serial.println(" ");
+    f_linear = cost_function(d_linear, c, Q, y, d_av, rho);
+    for(int i=0; i<N_ELEMENTS; i++){
+        Serial.println(d_linear[i]);
+    }
+    Serial.println(f_linear);
+    Serial.println(" ");
     //
     // ---------------------------------------------------------------------- //
 
@@ -183,6 +182,7 @@ void feedforwardConsensus(float (&K) [N_ELEMENTS][N_ELEMENTS],
         (L_dcmin>=Lref[my_index]-o[my_index]) ){
         f_dcmin = cost_function(d_dcmin, c, Q, y, d_av, rho);
         if(f_dcmin<f_best){
+            f_best = f_dcmin;
             for(int i=0; i<N_ELEMENTS; i++){
                 d_best[i] = d_dcmin[i];
             }
@@ -191,12 +191,12 @@ void feedforwardConsensus(float (&K) [N_ELEMENTS][N_ELEMENTS],
 
     // -------------------------  DEBUG (dcmin)  ---------------------------- //
     //
-    // f_dcmin = cost_function(d_dcmin, c, Q, y, d_av, rho);
-    // for(int i=0; i<N_ELEMENTS; i++){
-    //     Serial.println(d_dcmin[i]);
-    // }
-    // Serial.println(f_dcmin);
-    // Serial.println(" ");
+    f_dcmin = cost_function(d_dcmin, c, Q, y, d_av, rho);
+    for(int i=0; i<N_ELEMENTS; i++){
+        Serial.println(d_dcmin[i]);
+    }
+    Serial.println(f_dcmin);
+    Serial.println(" ");
     //
     // ---------------------------------------------------------------------- //
 
@@ -219,8 +219,12 @@ void feedforwardConsensus(float (&K) [N_ELEMENTS][N_ELEMENTS],
     float L_dcmax = local_lux(K,d_dcmax,o,elements);
     if ((d_dcmax[my_index]>=0) &&
         (L_dcmax>=Lref[my_index]-o[my_index]) ){
-        for(int i=0; i<N_ELEMENTS; i++){
-            d[i] = d_dcmax[i];
+        f_dcmax = cost_function(d_dcmax, c, Q, y, d_av, rho);
+        if(f_dcmax<f_best){
+            f_best = f_dcmax;
+            for(int i=0; i<N_ELEMENTS; i++){
+                d_best[i] = d_dcmax[i];
+            }
         }
     }
 
@@ -235,9 +239,65 @@ void feedforwardConsensus(float (&K) [N_ELEMENTS][N_ELEMENTS],
     //
     // ---------------------------------------------------------------------- //
 
+    // ---------------------------------------------------------------------- //
+    // 2.4) Compute best solution on the boundary: linear and dcmax constraints
+    // ---------------------------------------------------------------------- //
 
+    float g = (rho+Q[my_index]) / (n*(rho+Q[my_index]) - (elements[my_index].ganho)*(elements[my_index].ganho));
+    float v = 0;
+    float kr2 = 0;
+    for(int i=1; i<N_ELEMENTS; i++){
+        if(i==my_index){
+            continue;
+        }
+        else{
+            v   += z[i]*elements[i].ganho;
+            kr2 += (elements[i].ganho)*(elements[i].ganho);
+        }
+    }
+
+    float d_linear_dcmin[N_ELEMENTS];
+    for(int i=0; i<N_ELEMENTS; i++){
+        if(i!=my_index){
+            d_linear_dcmin[i] = z[i]/rho + g*((elements[i].ganho)*(Lref[my_index]-o[my_index]-v/rho))/rho;
+        }
+        else if(i==my_index){
+            d_linear_dcmin[i] = z[i]/(Q[i]+rho) - g*(kr2*z[i]/(Q[i]+rho))/rho; // <----- BUG: solved, wrong sign in the handout
+        }
+	}
+
+    // ------------------- Check solution feasibility ----------------------- //
+
+    float L_linear_dcmin = local_lux(K,d_linear_dcmin,o,elements);
+    if ((d_linear_dcmin[my_index]>=0) &&
+        (L_linear_dcmin>=Lref[my_index]-o[my_index]) ){
+        f_linear_dcmin = cost_function(d_linear_dcmin, c, Q, y, d_av, rho);
+        if(f_linear_dcmin<f_best){
+            f_best = f_linear_dcmin;
+            for(int i=0; i<N_ELEMENTS; i++){
+                d_best[i] = d_linear_dcmin[i];
+            }
+        }
+    }
+
+    // ----------------------- DEBUG (linear, dcmin)  ----------------------- //
+    //
+    f_linear_dcmin = cost_function(d_linear_dcmin, c, Q, y, d_av, rho);
+    for(int i=0; i<N_ELEMENTS; i++){
+        Serial.println(d_linear_dcmin[i]);
+    }
+    Serial.println(f_linear_dcmin);
+    Serial.println(" ");
+    //
+    // ---------------------------------------------------------------------- //
+
+
+
+    Serial.println(" ");
+    // Serial.println(f_best);
     return;
 }
+
 
 void setup() {
     Serial.begin(9600);
@@ -287,6 +347,7 @@ void loop() {
         // compute average, d_av
         // update local lagrangian, y
         // broadcast / receive computed 'd' vectors
+        Serial.println(" ---------------------------------------------------------- ");
     }
 
     Serial.print("Done.");
