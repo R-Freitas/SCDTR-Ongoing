@@ -14,43 +14,43 @@
 const int N_ELEMENTS = 2;
 const int my_index = 0;
 
-struct arduino_info {
-    int endereco;
-    double ganho;
-};
+struct arduino_info {int endereco; double ganho;};
 arduino_info elements[N_ELEMENTS] = {{0, 2}, {1, 1}};
 
 // ---------------------------------------------------------------------- //
 
-// System definition
-float K[N_ELEMENTS][N_ELEMENTS] = {{2,1},{1,2}};
-float Lref[N_ELEMENTS] = {150,80};
-float o[N_ELEMENTS] = {30,0};
-
-// Cost function definition
-float c[N_ELEMENTS] = {1,1};
-float Q[N_ELEMENTS] = {0,0};
-// for(int i=0; i<N_ELEMENTS; i++){
-//     Lref[i] = 160;
-//     o[i] = 0;
-//     c[i] = 1;               // Unit cost, equal for all luminaires
-//     for(int j=0; j<N_ELEMENTS; j++){
-//         if(i==j){
-//             Q[i][j] = 1;    // Unit cost, equal for all luminaires
-//         }
-//         else{
-//             Q[i][j] = 0;    // Unit cost, equal for all luminaires
-//         }
-//     }
+// float lux_local(float (&K) [N_ELEMENTS][N_ELEMENTS],
+//                     float (&d) [N_ELEMENTS],
+//                     float (&o) [N_ELEMENTS],
+//                     arduino_info (&elements) [N_ELEMENTS]){
 // }
 
-void feedforwardConsensus(float (&d) [N_ELEMENTS],
+float cost_function(float (&d) [N_ELEMENTS],
+                    float (&c) [N_ELEMENTS],
+                    float (&Q) [N_ELEMENTS],
+                    float (&y) [N_ELEMENTS],
+                    float (&d_av) [N_ELEMENTS],
+                    float &rho){
+    float f = 0;
+    f = 0.5*Q[my_index]*d[my_index]*d[my_index]
+      + c[my_index]*d[my_index];
+    for(int i=0; i<N_ELEMENTS; i++){
+        f += y[i]*(d[i]-d_av[i])
+           + 0.5*rho*(d[i]-d_av[i])*(d[i]-d_av[i]);
+    }
+    return f;
+}
+
+void feedforwardConsensus(float (&K) [N_ELEMENTS][N_ELEMENTS],
+                          float (&Lref) [N_ELEMENTS],
+                          float (&o) [N_ELEMENTS],
+                          float (&d) [N_ELEMENTS],
                           float (&c) [N_ELEMENTS],
                           float (&Q) [N_ELEMENTS],
                           float (&y) [N_ELEMENTS],
                           float (&d_av) [N_ELEMENTS],
-                          arduino_info (&elements) [N_ELEMENTS],
-                          float &rho){
+                          float &rho,
+                          arduino_info (&elements) [N_ELEMENTS]){
 
     // ###################################################################### //    <-- Code between these lines has been tested, adn is working
     // ---------------------------------------------------------------------- //
@@ -72,7 +72,7 @@ void feedforwardConsensus(float (&d) [N_ELEMENTS],
 
     // ------------------- Check solution feasibility ----------------------- //
 
-    float L_unconstrained = o[my_index];    // unconstrained illuminance at local desk
+    float L_unconstrained = o[my_index];    // unconstrained solution illuminance at local desk
     for(int i=0; i<N_ELEMENTS; i++){
         L_unconstrained += (elements[i].ganho)*d_unconstrained[i];
     }
@@ -86,19 +86,14 @@ void feedforwardConsensus(float (&d) [N_ELEMENTS],
     }
 
     // ---------------------- DEBUG (unconstrained)  ------------------------ //
-		// float f;
-		// f = 0.5*Q[my_index]*d_unconstrained[my_index]*d_unconstrained[my_index]
-		//   + c[my_index]*d_unconstrained[my_index];
-		// for(int j=0; j<N_ELEMENTS; j+=2){
-		// 	for(int i=0; i<N_ELEMENTS; i++){
-		// 		f += y[i]*(d_unconstrained[i]-d_av[i])
-		// 		   + 0.5*rho*(d_unconstrained[i]-d_av[i])*(d_unconstrained[i]-d_av[i]);
-		// 		Serial.println(d_unconstrained[j]);
-		// 		Serial.println(d_unconstrained[j+1]);
-		// 		Serial.println(f);
-		// 		Serial.println(" ");
-		// 	}
-	   // }
+    //
+    float f_unconstrained = cost_function(d_unconstrained, c, Q, y, d_av, rho);
+    for(int i=0; i<N_ELEMENTS; i++){
+        Serial.println(d_unconstrained[i]);
+    }
+    Serial.println(f_unconstrained);
+    Serial.println(" ");
+
     // ---------------------------------------------------------------------- //
 
     // ###################################################################### //    <-- Code between these lines has been tested, and is working
@@ -116,64 +111,57 @@ void feedforwardConsensus(float (&d) [N_ELEMENTS],
     float f_best = 100000;
     float d_best[N_ELEMENTS];
 
-    // Local cost function computation
-	// f = Q[my_index]*d_best[my_index]*d_best[my_index]
-	//   + c[my_index]*d_best[my_index];
-	// for(int i=0; i<N_ELEMENTS; i++){
-    //     f += y[i]*(d_best[i]-d_av[i])
-    //        + 0.5*rho*(d_best[i]-d_av[i])*(d_best[i]-d_av[i]);
-    // }
-
     // ---------------------------------------------------------------------- //
     //    2.1) Compute best solution on the boundary - Linear constraint
     // ---------------------------------------------------------------------- //
 
     float n = 0;
-    float w = 0;
+    float w1 = 0;
     for(int i=0; i<N_ELEMENTS; i++){
         if(i!=my_index){
             n += (elements[i].ganho)*(elements[i].ganho)/rho;
-            w -= (elements[i].ganho)*z[i]/rho;
+            w1 -= (elements[i].ganho)*z[i]/rho;
         }
         else if(i==my_index){
             n += (elements[i].ganho)*(elements[i].ganho)/(Q[i]+rho);
-            w -= (elements[i].ganho)*z[i]/(Q[i]+rho);
+            w1 -= (elements[i].ganho)*z[i]/(Q[i]+rho);
         }
     }
 
     float d_linear[N_ELEMENTS];
     for(int i=0; i<N_ELEMENTS; i++){
         if(i!=my_index){
-            d_linear[i] = (z[i]/rho) - (elements[i].ganho)*(o[i]-Lref[i]-w)/(n*rho);
+            d_linear[i] = (z[i]/rho) - (elements[i].ganho)*(o[i]-Lref[i]-w1)/(n*rho);
         }
         else if(i==my_index){
-            d_linear[i] = (z[i]/rho) - (elements[i].ganho)*(o[i]-Lref[i]-w)/(n*(Q[i]+rho));
+            d_linear[i] = (z[i]/(Q[i]+rho)) - (elements[i].ganho)*(o[i]-Lref[i]-w1)/(n*(Q[i]+rho));
         }
 	}
 
-    // ------------------- Check solution feasibility ----------------------- //
+    // ----- Check solution feasibility / get cost function value ----------- //
 
 
-    float L_linear = o[my_index];    // unconstrained illuminance at local desk
+    float L_linear = o[my_index];    // linear solution illuminance at local desk
     for(int i=0; i<N_ELEMENTS; i++){
         L_linear += (elements[i].ganho)*d_unconstrained[i];
     }
     if ((d_linear[my_index]>=0) && (d_linear[my_index]<=255)){
-        f_linear = Q[my_index]*d_best[my_index]*d_best[my_index]
-    	         + c[my_index]*d_best[my_index];
-    	for(int i=0; i<N_ELEMENTS; i++){
-            f_linear += y[i]*(d_best[i]-d_av[i])
-                      + 0.5*rho*(d_best[i]-d_av[i])*(d_best[i]-d_av[i]);
-        }
+        f_linear = cost_function(d_linear, c, Q, y, d_av, rho);
         if(f_linear<f_best){
             for(int i=0; i<N_ELEMENTS; i++){
-                d_best[i] = d_unconstrained[i];
+                d_best[i] = d_linear[i];
             }
         }
     }
 
     // ------------------------  DEBUG (linear)  ---------------------------- //
-
+    //
+    f_linear = cost_function(d_linear, c, Q, y, d_av, rho);
+    for(int i=0; i<N_ELEMENTS; i++){
+        Serial.println(d_linear[i]);
+    }
+    Serial.println(f_linear);
+    Serial.println(" ");
 
     return;
 }
@@ -183,6 +171,29 @@ void setup() {
  }
 
 void loop() {
+
+    // System definition
+    static float K[N_ELEMENTS][N_ELEMENTS] = {{2,1},{1,2}};
+    static float Lref[N_ELEMENTS] = {150,80};
+    static float o[N_ELEMENTS] = {30,0};
+
+    // Cost function definition
+    static float c[N_ELEMENTS] = {1,1};
+    static float Q[N_ELEMENTS] = {1,1};
+    // for(int i=0; i<N_ELEMENTS; i++){
+    //     Lref[i] = 160;
+    //     o[i] = 0;
+    //     c[i] = 1;               // Unit cost, equal for all luminaires
+    //     for(int j=0; j<N_ELEMENTS; j++){
+    //         if(i==j){
+    //             Q[i][j] = 1;    // Unit cost, equal for all luminaires
+    //         }
+    //         else{
+    //             Q[i][j] = 0;    // Unit cost, equal for all luminaires
+    //         }
+    //     }
+    // }
+
     // ADMM auxiliary variables
     static float rho = 0.01;                       // ADMM penalty parameter
     static float y[N_ELEMENTS];                    // Lagrange multipliers vector
@@ -199,7 +210,7 @@ void loop() {
     }
     int iterations = 50;
     for(int i=0; i<iterations; i++){
-        feedforwardConsensus(d, c, Q, y, d_av, elements, rho);        // compute local duty cycle vector
+        feedforwardConsensus(K, Lref, o, d, c, Q, y, d_av, rho, elements);        // compute local duty cycle vector
         // compute average, d_av
         // update local lagrangian, y
         // broadcast / receive computed 'd' vectors
