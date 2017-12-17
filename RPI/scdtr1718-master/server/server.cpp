@@ -1,44 +1,76 @@
-//g++ -std=c++11 async_tcp_client.cpp -o client -lboost_system -pthread
-
+//g++ -std=c++11 server.cpp -o server -lboost_system -pthread
 #include <iostream>
 #include <boost/bind.hpp>
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/asio.hpp>
 #include <boost/shared_ptr.hpp>
 
+using boost::asio::deadline_timer;
 using namespace boost;
 using namespace boost::asio;
 using ip::tcp;
 
+
 class conn :  public enable_shared_from_this<conn> {
+public:
+  conn(io_service& io)
+    :  sock_(io),
+      KeepAlive_(io)
+    {}
+
+	static shared_ptr<conn> create(io_service& io) {
+         return shared_ptr<conn>(new conn(io));
+    }
+  tcp::socket& socket() {return sock_;}
+
+  void start()
+  {
+    auto self = shared_from_this();
+    async_write(sock_, buffer("Connection established\n"),
+    		boost::bind(&conn::handle_connect, shared_from_this()));
+  }
+  void stop()
+  {
+    stopped_ = true;
+    boost::system::error_code ignored_ec;
+    sock_.close(ignored_ec);
+    //deadline_.cancel();
+    //heartbeat_timer_.cancel();
+  }
+
+
+
 private:
    	tcp::socket sock_;
     bool stopped_;
     boost::asio::streambuf input_buffer_;
    	std::string msg_;
-   	conn(io_service& io) :  sock_(io)  {}
-	void handle_connection(){
-		//Dealing with connection
-    start_read();
+    boost::asio::deadline_timer KeepAlive_;
+    boost::system::error_code ec;
 
-    start_write();
+	void handle_connect(){
+		//Dealing with connection
+
+    start_read_connect();
+
+    start_write_connect();
 
 
 
 	}
-  void start_read(){
+  void start_read_connect(){
     boost::asio::async_read_until(sock_, input_buffer_, '\n',
-        boost::bind(&conn::handle_read, this, _1));
+        boost::bind(&conn::handle_read_connect, this, _1));
         //Starts reading event
   }
 
 
-  void handle_read(const boost::system::error_code& ec)
+  void handle_read_connect(const boost::system::error_code& ec)
   {
     if (stopped_)
       return;
 
-    if (!ec)
+    if (!ec || ec == boost::asio::error::eof)
     {
       // Extract the newline-delimited message from the buffer.
       std::string line;
@@ -51,54 +83,41 @@ private:
         std::cout << "Received: " << line << "\n";
       }
 
-      start_read();
-    }
-    else
-    {
-      std::cout << "Error on receive:Client disconnected" << "\n";
 
-      stop();
     }
+    start_read_connect();
+
   }
 
-  void start_write(){
+  void start_write_connect()
+  {
     if (stopped_){
       return;
     }
+
     else{
-      async_write(sock_, buffer(""),
-      boost::bind(&conn::handle_connection, shared_from_this()));
+    async_write(sock_, buffer("\n",1),
+    boost::bind(&conn::handle_write_connect, shared_from_this(), _1));
+
     }
   }
 
-
-	void handle_write(){
-
-	}
-
-
-
-public:
-	static shared_ptr<conn> create(io_service& io) {
-         return shared_ptr<conn>(new conn(io));
+  void handle_write_connect(const boost::system::error_code& ec)
+  {
+    if (stopped_){
+      return;
     }
-    tcp::socket& socket() {return sock_;}
-    void start() {
-    	auto self = shared_from_this();
-      std::cout << "HEY" << "\n";
-    	async_write(sock_, buffer("Connection established\n"),
-    		boost::bind(&conn::handle_connection, shared_from_this()));
-        std::cout << "HEY2" << "\n";
+    if (!ec){
+      start_write_connect();
+    }
+    else{
+      std::cout << "Client disconnected" << "\n";
+      stop();
+    }
 
-    }
-    void stop()
-    {
-      stopped_ = true;
-      boost::system::error_code ignored_ec;
-      //sock_.close(ignored_ec);
-      //deadline_.cancel();
-      //heartbeat_timer_.cancel();
-    }
+
+  }
+
 };
 
 class tcp_server {
@@ -124,4 +143,6 @@ int main()  try {
     io_service io;
     tcp_server server(io);
     io.run();
+
+
 } catch(std::exception &e) {std::cout << e.what();}
