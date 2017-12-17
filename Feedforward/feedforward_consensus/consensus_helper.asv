@@ -8,7 +8,7 @@ L = [L1;L2]; o = [o1;o2];
 
 c1 = 1; c2 = 1; q1 = 1; q2 = 1;
 c = [c1 c2]; Q = [q1 0; 0 q2];
-%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ----------------------------------------------------- %
 %                 SOLVE WITH CONSENSUS
 % ----------------------------------------------------- %
@@ -32,6 +32,7 @@ k2 = [k21;k22];
 
 %iterations
 for i=1:5,
+  % ----------------------------------------------------- %
   % node 1
    d11_best = -1; % d_best
    d12_best = -1; % d_best
@@ -53,7 +54,6 @@ for i=1:5,
    w1 = -k11*p11*z11-k12*z12*p12;
    w2 = -z11*p11;
    w3 = z11*p11;
-   
    %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    %            compute unconstrained minimum
    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -77,7 +77,6 @@ for i=1:5,
            min_best_1(i) = min_unconstrained;
        end;
    end;
-  
    %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    %    compute minimum constrained to linear boundary   
    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -100,51 +99,42 @@ for i=1:5,
            min_best_1(i) = min_boundary_linear;
        end;
    end;
-   
    %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    %compute minimum constrained to 0 boundary
    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    d11b0 = 0;
    d12b0 = p12*z12;
-   buffer_b0(1,i) = d11b0;
-   buffer_b0(2,i) = d12b0;
    %check feasibility of minimum constrained to 0 boundary
    if (d11b0 > 100), sol_boundary_0 = 0; end;
    if (k11*d11b0 + k12*d12b0 < L1-o1), sol_boundary_0 = 0; end;
    % compute function value and if best store new optimum
-   sol_boundary_0 = 1;
    if sol_boundary_0, 
         min_boundary_0 = 0.5*q1*d11b0^2 + c1*d11b0 + y1(1)*(d11b0-d1_av(1)) + ...
            y1(2)*(d12b0-d1_av(2)) + rho/2*(d11b0-d1_av(1))^2 + rho/2*(d12b0-d1_av(2))^2;
-       buffer_b0(3,i) = min_boundary_0;
        if min_boundary_0 < min_best_1(i),
            d11_best = d11b0;
            d12_best = d12b0;
            min_best_1(i) = min_boundary_0;
        end;
    end;
-   
-   %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-   %    compute minimum constrained to 100 boundary
-   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-   d11b100 = 100;
-   d12b100 = p12*z12;
-   buffer_b100(1,i) = d11b100;
-   buffer_b100(2,i) = d12b100;
-   %check feasibility of minimum constrained to 100 boundary
-   if (d11b0 < 0), sol_boundary_100 = 0; end;
-   if (k11*d11b100 + k12*d12b100 < L1-o1), sol_boundary_100 = 0; end;
-   % compute function value and if best store new optimum
-   if sol_boundary_100, 
-        min_boundary_100 = 0.5*q1*d11b100^2 + c1*d11b100 + y1(1)*(d11b100-d1_av(1)) + ...
-           y1(2)*(d12b100-d1_av(2)) + rho/2*(d11b100-d1_av(1))^2 + rho/2*(d12b100-d1_av(2))^2;
-       buffer_b100(3,i) = min_boundary_100;
-       if min_boundary_100 < min_best_1(i),
-           d11_best = d11b100;
-           d12_best = d12b100;
-           min_best_1(i) = min_boundary_100;
-       end;
-   end;
+   % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   % %    compute minimum constrained to 100 boundary
+   % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   % d11b100 = 100;
+   % d12b100 = p12*z12;
+   % %check feasibility of minimum constrained to 100 boundary
+   % if (d11b0 < 0), sol_boundary_100 = 0; end;
+   % if (k11*d11b100 + k12*d12b100 < L1-o1), sol_boundary_100 = 0; end;
+   % % compute function value and if best store new optimum
+   % if sol_boundary_100, 
+        % min_boundary_100 = 0.5*q1*d11b100^2 + c1*d11b100 + y1(1)*(d11b100-d1_av(1)) + ...
+           % y1(2)*(d12b100-d1_av(2)) + rho/2*(d11b100-d1_av(1))^2 + rho/2*(d12b100-d1_av(2))^2;
+       % if min_boundary_100 < min_best_1(i),
+           % d11_best = d11b100;
+           % d12_best = d12b100;
+           % min_best_1(i) = min_boundary_100;
+       % end;
+   % end;
    % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    % % compute minimum constrained to linear and zero boundary
    % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -199,8 +189,6 @@ for i=1:5,
     end;
     buffer_u
     buffer_l
-    buffer_b0
-    buffer_b100
    % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    % %store data and save for next cycle
    % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -19,11 +19,16 @@ arduino_info elements[N_ELEMENTS] = {{0, 2}, {1, 1}};
 
 // ---------------------------------------------------------------------- //
 
-// float lux_local(float (&K) [N_ELEMENTS][N_ELEMENTS],
-//                     float (&d) [N_ELEMENTS],
-//                     float (&o) [N_ELEMENTS],
-//                     arduino_info (&elements) [N_ELEMENTS]){
-// }
+float local_lux(float (&K) [N_ELEMENTS][N_ELEMENTS],
+                float (&d) [N_ELEMENTS],
+                float (&o) [N_ELEMENTS],
+                arduino_info (&elements) [N_ELEMENTS]){
+    float L = o[my_index];    // unconstrained solution illuminance at local desk
+    for(int i=0; i<N_ELEMENTS; i++){
+        L += (elements[i].ganho)*d[i];
+    }
+    return L;
+}
 
 float cost_function(float (&d) [N_ELEMENTS],
                     float (&c) [N_ELEMENTS],
@@ -51,8 +56,6 @@ void feedforwardConsensus(float (&K) [N_ELEMENTS][N_ELEMENTS],
                           float (&d_av) [N_ELEMENTS],
                           float &rho,
                           arduino_info (&elements) [N_ELEMENTS]){
-
-    // ###################################################################### //    <-- Code between these lines has been tested, adn is working
     // ---------------------------------------------------------------------- //
     //                  1) Compute unconstrained solution
     // ---------------------------------------------------------------------- //
@@ -72,31 +75,26 @@ void feedforwardConsensus(float (&K) [N_ELEMENTS][N_ELEMENTS],
 
     // ------------------- Check solution feasibility ----------------------- //
 
-    float L_unconstrained = o[my_index];    // unconstrained solution illuminance at local desk
-    for(int i=0; i<N_ELEMENTS; i++){
-        L_unconstrained += (elements[i].ganho)*d_unconstrained[i];
-    }
+    float L_unconstrained = local_lux(K,d_unconstrained,o,elements);
     if ((d_unconstrained[my_index]>=0) &&
-        (d_unconstrained[my_index]<=255) &&
+        (d_unconstrained[my_index]<=100) &&
         (L_unconstrained>=Lref[my_index]-o[my_index]) ){
         for(int i=0; i<N_ELEMENTS; i++){
             d[i] = d_unconstrained[i];
-            return;             // The unconstrained solution is the optimal solution - all done.
-        }
+            return;             // The unconstrained solution is the
+    }                           // optimal solution - all done!
     }
 
     // ---------------------- DEBUG (unconstrained)  ------------------------ //
     //
-    float f_unconstrained = cost_function(d_unconstrained, c, Q, y, d_av, rho);
-    for(int i=0; i<N_ELEMENTS; i++){
-        Serial.println(d_unconstrained[i]);
-    }
-    Serial.println(f_unconstrained);
-    Serial.println(" ");
-
+    // float f_unconstrained = cost_function(d_unconstrained, c, Q, y, d_av, rho);
+    // for(int i=0; i<N_ELEMENTS; i++){
+    //     Serial.println(d_unconstrained[i]);
+    // }
+    // Serial.println(f_unconstrained);
+    // Serial.println(" ");
+    //
     // ---------------------------------------------------------------------- //
-
-    // ###################################################################### //    <-- Code between these lines has been tested, and is working
 
     // ---------------------------------------------------------------------- //
     //       2) Compute best solution on the boundary - Initialization
@@ -131,21 +129,20 @@ void feedforwardConsensus(float (&K) [N_ELEMENTS][N_ELEMENTS],
     float d_linear[N_ELEMENTS];
     for(int i=0; i<N_ELEMENTS; i++){
         if(i!=my_index){
-            d_linear[i] = (z[i]/rho) - (elements[i].ganho)*(o[i]-Lref[i]-w1)/(n*rho);
+            d_linear[i] = z[i]/rho
+                        - (elements[i].ganho)*(o[my_index]-Lref[my_index]-w1)/(n*rho);
         }
         else if(i==my_index){
-            d_linear[i] = (z[i]/(Q[i]+rho)) - (elements[i].ganho)*(o[i]-Lref[i]-w1)/(n*(Q[i]+rho));
+            d_linear[i] = z[i]/(Q[i]+rho)
+                        - (elements[i].ganho)*(o[my_index]-Lref[my_index]-w1)/(n*(Q[i]+rho));
         }
 	}
 
     // ----- Check solution feasibility / get cost function value ----------- //
 
-
-    float L_linear = o[my_index];    // linear solution illuminance at local desk
-    for(int i=0; i<N_ELEMENTS; i++){
-        L_linear += (elements[i].ganho)*d_unconstrained[i];
-    }
-    if ((d_linear[my_index]>=0) && (d_linear[my_index]<=255)){
+    float L_linear = local_lux(K,d_linear,o,elements);
+    if ((d_linear[my_index]>=0) &&
+        (d_linear[my_index]<=100)){
         f_linear = cost_function(d_linear, c, Q, y, d_av, rho);
         if(f_linear<f_best){
             for(int i=0; i<N_ELEMENTS; i++){
@@ -156,12 +153,88 @@ void feedforwardConsensus(float (&K) [N_ELEMENTS][N_ELEMENTS],
 
     // ------------------------  DEBUG (linear)  ---------------------------- //
     //
-    f_linear = cost_function(d_linear, c, Q, y, d_av, rho);
+    // f_linear = cost_function(d_linear, c, Q, y, d_av, rho);
+    // for(int i=0; i<N_ELEMENTS; i++){
+    //     Serial.println(d_linear[i]);
+    // }
+    // Serial.println(f_linear);
+    // Serial.println(" ");
+    //
+    // ---------------------------------------------------------------------- //
+
+    // ---------------------------------------------------------------------- //
+    //     2.2) Compute best solution on the boundary - dcmin constraint
+    // ---------------------------------------------------------------------- //
+
+    float d_dcmin[N_ELEMENTS];
     for(int i=0; i<N_ELEMENTS; i++){
-        Serial.println(d_linear[i]);
+        if(i!=my_index){
+            d_dcmin[i] = z[i]/rho;
+        }
+        else if(i==my_index){
+            d_dcmin[i] = 0;
+        }
+	}
+
+    // ----- Check solution feasibility / get cost function value ----------- //
+
+    float L_dcmin = local_lux(K,d_dcmin,o,elements);
+    if ((d_dcmin[my_index]<=100) &&
+        (L_dcmin>=Lref[my_index]-o[my_index]) ){
+        f_dcmin = cost_function(d_dcmin, c, Q, y, d_av, rho);
+        if(f_dcmin<f_best){
+            for(int i=0; i<N_ELEMENTS; i++){
+                d_best[i] = d_dcmin[i];
+            }
+        }
     }
-    Serial.println(f_linear);
+
+    // -------------------------  DEBUG (dcmin)  ---------------------------- //
+    //
+    // f_dcmin = cost_function(d_dcmin, c, Q, y, d_av, rho);
+    // for(int i=0; i<N_ELEMENTS; i++){
+    //     Serial.println(d_dcmin[i]);
+    // }
+    // Serial.println(f_dcmin);
+    // Serial.println(" ");
+    //
+    // ---------------------------------------------------------------------- //
+
+    // ---------------------------------------------------------------------- //
+    //     2.3) Compute best solution on the boundary - dcmax constraint
+    // ---------------------------------------------------------------------- //
+
+    float d_dcmax[N_ELEMENTS];
+    for(int i=0; i<N_ELEMENTS; i++){
+        if(i!=my_index){
+            d_dcmax[i] = z[i]/rho;
+        }
+        else if(i==my_index){
+            d_dcmax[i] = 100;
+        }
+	}
+
+    // ------------------- Check solution feasibility ----------------------- //
+
+    float L_dcmax = local_lux(K,d_dcmax,o,elements);
+    if ((d_dcmax[my_index]>=0) &&
+        (L_dcmax>=Lref[my_index]-o[my_index]) ){
+        for(int i=0; i<N_ELEMENTS; i++){
+            d[i] = d_dcmax[i];
+        }
+    }
+
+    // -------------------------  DEBUG (dcmax)  ---------------------------- //
+    //
+    f_dcmax = cost_function(d_dcmax, c, Q, y, d_av, rho);
+    for(int i=0; i<N_ELEMENTS; i++){
+        Serial.println(d_dcmax[i]);
+    }
+    Serial.println(f_dcmax);
     Serial.println(" ");
+    //
+    // ---------------------------------------------------------------------- //
+
 
     return;
 }
