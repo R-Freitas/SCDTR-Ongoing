@@ -91,15 +91,32 @@ private:
 
   void start_write_connect()
   {
+    if (stopped_){
+      return;
+    }
 
-    async_write(sock_, buffer(""),
-    boost::bind(&conn::start_write_connect, shared_from_this()));
+    else{
+    async_write(sock_, buffer("\n",1),
+    boost::bind(&conn::handle_write_connect, shared_from_this(), _1));
+
+    }
   }
 
-  
+  void handle_write_connect(const boost::system::error_code& ec)
+  {
+    if (stopped_){
+      return;
+    }
+    if (!ec){
+      start_write_connect();
+    }
+    else{
+      std::cout << "Client disconnected" << "\n";
+      stop();
+    }
 
 
-
+  }
 
 };
 
@@ -125,7 +142,6 @@ private:
 int main()  try {
     io_service io;
     tcp_server server(io);
-    //auto work = boost::make_shared<boost::asio::io_service::work>(io);
     io.run();
 
 
