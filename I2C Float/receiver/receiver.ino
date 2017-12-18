@@ -21,13 +21,13 @@ void receiveEvent(int numBytes){
     i++;
     }
     
-   if(i==2){      
+   if(i==N_ELEMENTS){      
         for(int i=0; i<N_ELEMENTS; i++){
-        float aux = u[i].fval;
-        Serial.print("float(");
-        Serial.print(i);
-        Serial.print(") = ");
-        Serial.println(aux); 
+            float aux = u[i].fval;
+            Serial.print("float(");
+            Serial.print(i);
+            Serial.print(") = ");
+            Serial.println(aux); 
         }
     }
 }
