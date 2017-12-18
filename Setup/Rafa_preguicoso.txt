@@ -1,0 +1,8 @@
+  if(Serial.available()> 0){
+    String data = "";
+    while(Serial.available()){
+    data += (char) Serial.read();
+    }
+
+  Serial.println(data);
+  }
