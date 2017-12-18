@@ -4,38 +4,42 @@
 #include <boost/asio.hpp>
 #include <boost/shared_ptr.hpp>
 
-using namespace boost; 
-using namespace boost::asio; 
+using namespace boost;
+using namespace boost::asio;
 using ip::tcp;
 
 class conn :  public enable_shared_from_this<conn> {
-private:  
+private:
    	tcp::socket sock_;
    	std::string msg_;
    	conn(io_service& io) :  sock_(io)  {}
    	void h_write()   {
-   		//do something to perpetuate connection
-   		//or close it cleanly
+   		boost::bind(&conn::handle_connection,sock_);
    	}
-public: 
+    void handle_connection(){
+      for(;;){
+        std::cout << "HEY\n";
+      }
+    }
+public:
 	static shared_ptr<conn> create(io_service& io) {
          return shared_ptr<conn>(new conn(io));
     }
     tcp::socket& socket() {return sock_;}
     void start() {
     	async_write(sock_,buffer("Hello World\n"),
-    		boost::bind(&conn::h_write, shared_from_this())); 
+    		boost::bind(&conn::h_write, shared_from_this()));
     }
 };
 class tcp_server {
-private:  
+private:
     tcp::acceptor acceptor_;
-public:  
+public:
     tcp_server(io_service& io)
      : acceptor_(io, tcp::endpoint(tcp::v4(), 10000))  {
                    start_accept();
      }
-private:  
+private:
    void start_accept() {
        shared_ptr<conn> new_conn =
             conn::create(acceptor_.get_io_service());
