@@ -17,7 +17,10 @@ const int my_index = 0;
 struct arduino_info {int endereco; double ganho;};
 arduino_info elements[N_ELEMENTS] = {{0, 2}, {1, 1}};
 
-// ---------------------------------------------------------------------- //
+// ---------------------- Reused functions ------------------------------ //
+
+
+// ------------------------ My functions -------------------------------- //
 
 float local_lux(float (&K) [N_ELEMENTS][N_ELEMENTS],
                 float (&d) [N_ELEMENTS],
@@ -80,9 +83,9 @@ void feedforwardConsensus(float (&K) [N_ELEMENTS][N_ELEMENTS],
         (d_unconstrained[my_index]<=100) &&
         (L_unconstrained>=Lref[my_index]-o[my_index]) ){
         for(int i=0; i<N_ELEMENTS; i++){
-            d[i] = d_unconstrained[i];
-            return;             // The unconstrained solution is the
-    }                           // optimal solution - all done!
+            d[i] = d_unconstrained[i];    // The unconstrained solution is the
+            return;                       // optimal solution - all done!
+    }
     }
 
     // ---------------------- DEBUG (unconstrained)  ------------------------ //
@@ -328,10 +331,63 @@ void feedforwardConsensus(float (&K) [N_ELEMENTS][N_ELEMENTS],
     //
     // ---------------------------------------------------------------------- //
 
+    // ---------------------------------------------------------------------- //
+    //              2.6) Retrieve best solution on the boundary
+    // ---------------------------------------------------------------------- //
+
+    for(int i=0; i<N_ELEMENTS; i++){
+        d[i] = d_best[i];
+    }
+
     // Serial.println(f_best);
     return;
 }
 
+void compute_av(float (&d) [N_ELEMENTS],
+                float (&d_av) [N_ELEMENTS],
+                float (&d_copies) [N_ELEMENTS][N_ELEMENTS]){
+    for(int j=0; j<N_ELEMENTS; j++){
+        d_av[j] = 0;
+        for(int i=0; i<N_ELEMENTS; i++){
+            if(i!=my_index){
+                d_av[j] += d_copies[i][j];
+            }
+            else if(i==my_index){
+                d_av[j] += d[j];
+            }
+        }
+        d_av[j] /= N_ELEMENTS;
+        // ----------- DEBUG ------------ //
+        Serial.print("d(");
+        Serial.print(j);
+        Serial.print(") = ");
+        Serial.print(d[j]);
+        Serial.print("\t\t d_av(");
+        Serial.print(j);
+        Serial.print(") = ");
+        Serial.println(d_av[j]);
+        // ----------------------------- //
+    }
+    Serial.println("");
+}
+
+void update_y(float (&y) [N_ELEMENTS],
+              float rho,
+              float (&d) [N_ELEMENTS],
+              float (&d_av) [N_ELEMENTS]){
+    for(int i=0; i<N_ELEMENTS; i++){
+        y[i] += rho*(d[i]-d_av[i]);
+        // ----------- DEBUG ------------ //
+        Serial.print("y(");
+        Serial.print(i);
+        Serial.print(") = ");
+        Serial.println(y[i]);
+        // ----------------------------- //
+    }
+    Serial.println("");
+}
+
+// ------------------------ Setup / Loop --------------------------------- //
 
 void setup() {
     Serial.begin(9600);
@@ -369,22 +425,30 @@ void loop() {
     static float d_copies[N_ELEMENTS][N_ELEMENTS]; // Duty cycles buffer, for all arduinos
     for(int i=0; i<N_ELEMENTS; i++){
         y[i] = 0;
-        d[i] = -1;
+        d[i] = 0;
         d_av[i] = 0;
         for(int j=0; j<N_ELEMENTS; j++){
             d_copies[i][j] = 0;
         }
     }
     int iterations = 50;
-    for(int i=0; i<iterations; i++){
+    //for(int i=0; i<iterations; i++){
+        // compute duty-cycles vector, d
         feedforwardConsensus(K, Lref, o, d, c, Q, y, d_av, rho, elements);        // compute local duty cycle vector
-        // compute average, d_av
-        // update local lagrangian, y
-        // broadcast / receive computed 'd' vectors
-        Serial.println("-----------------------------------");
-        Serial.println(" ");
-    }
 
-    Serial.print("Done.");
+        // compute average duty-cycles vector, d_av
+        compute_av(d, d_av, d_copies);
+
+        // update local lagrangian, y
+        update_y(y, rho, d, d_av);
+
+    //    }
+        // broadcast / receive computed 'd' vectors
+
+        // Serial.println("-----------------------------------");
+        // Serial.println(" ");
+
+
+    Serial.println("Done.");
     while(1){}
 }
