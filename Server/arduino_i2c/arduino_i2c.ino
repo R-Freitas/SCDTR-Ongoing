@@ -15,7 +15,8 @@ void loop() {
   Serial.print(msg);
   respond_to_raspberry(msg);
   delay(500);
-  i++;
+
+  
 
 }
 void respond_to_raspberry(String response){
