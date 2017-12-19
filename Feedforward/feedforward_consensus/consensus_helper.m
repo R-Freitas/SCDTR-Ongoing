@@ -66,11 +66,11 @@ for i=1:5,
    if (d11u > 100), sol_unconstrained = 0; end;
    if (k11*d11u + k12*d12u < L1-o1), sol_unconstrained = 0; end;
    % compute function value and if best store new optimum
-   sol_unconstrained = 1;
+   buffer_u(3,i) = 0.5*q1*d11u^2 + c1*d11u + y1(1)*(d11u-d1_av(1)) + ...
+           y1(2)*(d12u-d1_av(2)) + rho/2*(d11u-d1_av(1))^2 + rho/2*(d12u-d1_av(2))^2;
    if sol_unconstrained, 
        min_unconstrained = 0.5*q1*d11u^2 + c1*d11u + y1(1)*(d11u-d1_av(1)) + ...
            y1(2)*(d12u-d1_av(2)) + rho/2*(d11u-d1_av(1))^2 + rho/2*(d12u-d1_av(2))^2;
-       buffer_u(3,i) = min_unconstrained;
        if min_unconstrained < min_best_1(i),
            d11_best = d11u;
            d12_best = d12u;
@@ -89,11 +89,11 @@ for i=1:5,
    if (d11bl < 0), sol_boundary_linear = 0; end;
    if (d11bl > 100), sol_boundary_linear = 0; end;
    % compute function value and if best store new optimum
-   sol_boundary_linear = 1;
+   buffer_l(3,i) = 0.5*q1*d11bl^2 + c1*d11bl + y1(1)*(d11bl-d1_av(1)) + ...
+           y1(2)*(d12bl-d1_av(2)) + rho/2*(d11bl-d1_av(1))^2 + rho/2*(d12bl-d1_av(2))^2;
    if sol_boundary_linear, 
         min_boundary_linear = 0.5*q1*d11bl^2 + c1*d11bl + y1(1)*(d11bl-d1_av(1)) + ...
            y1(2)*(d12bl-d1_av(2)) + rho/2*(d11bl-d1_av(1))^2 + rho/2*(d12bl-d1_av(2))^2;
-       buffer_l(3,i) = min_boundary_linear;
        if min_boundary_linear < min_best_1(i),
            d11_best = d11bl;
            d12_best = d12bl;
@@ -112,11 +112,11 @@ for i=1:5,
    if (d11b0 > 100), sol_boundary_0 = 0; end;
    if (k11*d11b0 + k12*d12b0 < L1-o1), sol_boundary_0 = 0; end;
    % compute function value and if best store new optimum
-   sol_boundary_0 = 1;
+   buffer_b0(3,i) = 0.5*q1*d11b0^2 + c1*d11b0 + y1(1)*(d11b0-d1_av(1)) + ...
+           y1(2)*(d12b0-d1_av(2)) + rho/2*(d11b0-d1_av(1))^2 + rho/2*(d12b0-d1_av(2))^2;
    if sol_boundary_0, 
         min_boundary_0 = 0.5*q1*d11b0^2 + c1*d11b0 + y1(1)*(d11b0-d1_av(1)) + ...
            y1(2)*(d12b0-d1_av(2)) + rho/2*(d11b0-d1_av(1))^2 + rho/2*(d12b0-d1_av(2))^2;
-       buffer_b0(3,i) = min_boundary_0;
        if min_boundary_0 < min_best_1(i),
            d11_best = d11b0;
            d12_best = d12b0;
@@ -135,11 +135,11 @@ for i=1:5,
    if (d11b0 < 0), sol_boundary_100 = 0; end;
    if (k11*d11b100 + k12*d12b100 < L1-o1), sol_boundary_100 = 0; end;
    % compute function value and if best store new optimum
-   sol_boundary_100 = 1;
+       buffer_b100(3,i) = 0.5*q1*d11b100^2 + c1*d11b100 + y1(1)*(d11b100-d1_av(1)) + ...
+           y1(2)*(d12b100-d1_av(2)) + rho/2*(d11b100-d1_av(1))^2 + rho/2*(d12b100-d1_av(2))^2;
    if sol_boundary_100, 
         min_boundary_100 = 0.5*q1*d11b100^2 + c1*d11b100 + y1(1)*(d11b100-d1_av(1)) + ...
            y1(2)*(d12b100-d1_av(2)) + rho/2*(d11b100-d1_av(1))^2 + rho/2*(d12b100-d1_av(2))^2;
-       buffer_b100(3,i) = min_boundary_100;
        if min_boundary_100 < min_best_1(i),
            d11_best = d11b100;
            d12_best = d12b100;
@@ -166,11 +166,11 @@ for i=1:5,
       %check feasibility
    if (d11l0 > 100), sol_linear_0 = 0; end;
    % compute function value and if best store new optimum
-   sol_linear_0 = 1;
+   buffer_l0(3,i) = 0.5*q1*d11l0^2 + c1*d11l0 + y1(1)*(d11l0-d1_av(1)) + ...
+           y1(2)*(d12l0-d1_av(2)) + rho/2*(d11l0-d1_av(1))^2 + rho/2*(d12l0-d1_av(2))^2;
    if sol_linear_0, 
         min_linear_0 = 0.5*q1*d11l0^2 + c1*d11l0 + y1(1)*(d11l0-d1_av(1)) + ...
            y1(2)*(d12l0-d1_av(2)) + rho/2*(d11l0-d1_av(1))^2 + rho/2*(d12l0-d1_av(2))^2;
-       buffer_l0(3,i) = min_linear_0;
        if min_linear_0 < min_best_1(i),
            d11_best = d11l0;
            d12_best = d12l0;
@@ -197,17 +197,18 @@ for i=1:5,
    %check feasibility
    if (d11l100 < 0), sol_linear_100 = 0; end;
    % compute function value and if best store new optimum
+   buffer_l100(3,i) = 0.5*q1*d11l100^2 + c1*d11l100 + y1(1)*(d11l100-d1_av(1)) + ...
+           y1(2)*(d12l100-d1_av(2)) + rho/2*(d11l100-d1_av(1))^2 + rho/2*(d12l100-d1_av(2))^2;         
    if sol_linear_100, 
         min_linear_100 = 0.5*q1*d11l100^2 + c1*d11l100 + y1(1)*(d11l100-d1_av(1)) + ...
            y1(2)*(d12l100-d1_av(2)) + rho/2*(d11l100-d1_av(1))^2 + rho/2*(d12l100-d1_av(2))^2;
-       buffer_l100(3,i) = min_linear_100;      
        if min_linear_100 < min_best_1(i),
            d11_best = d11u;
            d12_best = d12u;
            min_best_1_(i) = min_linear100;
        end;
     end;
-    
+end 
     %% Print buffers
     
     buffer_u
@@ -217,25 +218,24 @@ for i=1:5,
     buffer_l0
     buffer_l100
 
-end    
+    
    %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-   % %store data and save for next cycle
-   % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-   % best_d11(i) = d11_best;
-   % best_d12(i) = d12_best;
-   % d1 = [d11_best;d12_best];
+   %store data and save for next cycle
+   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   best_d11(i) = d11_best;
+   best_d12(i) = d12_best;
+   d1 = [d11_best;d12_best]
    
+   %compute average with available knowledge
+   d1_av = (d1+d2_copy)/2
+   %update local lagrangian
+   y1 = y1 + rho*(d1-d1_av)
+   % send node 1 solution to neighboors
+   d1_copy = d1;
 
-   % %compute average with available knowledge
-   % d1_av = (d1+d2_copy)/2;
-   % %update local lagrangian
-   % y1 = y1 + rho*(d1-d1_av);
-   % % send node 1 solution to neighboors
-   % d1_copy = d1;
+% ----------------------------------------------------- %
 
-   % ----------------------------------------------------- %
-
-  % % node 2 
+  %% node 2 
   % d21_best = -1;
    % d22_best = -1;
    % min_best_2(i) = 100000; %big number

@@ -1,4 +1,5 @@
-close all, clear all;
+close all, clear all; clc;
+
 %The system
 k11 = 2; k12 = 1; k21 = 1; k22 = 2;
 L1 = 150; o1 = 30; L2 = 80; o2 = 0;
@@ -6,7 +7,7 @@ K = [k11, k12 ; k21 , k22];
 L = [L1;L2]; o = [o1;o2];
 
 %The cost function
-c1 = 1; c2 = 1; q1 = 0.0; q2 = 0.0;
+c1 = 1; c2 = 1; q1 = 1; q2 = 1;
 c = [c1 c2]; Q = [q1 0; 0 q2];
 
 % SOLVE WITH CONSENSUS
@@ -162,19 +163,19 @@ for i=1:50,
    %store data and save for next cycle
    best_d11(i) = d11_best;
    best_d12(i) = d12_best;
-   d1 = [d11_best;d12_best];
+   d1 = [d11_best;d12_best]
    
    %DEBUG: check with matlab quadprog
-   Q = [q1+rho, 0; 0 rho];
-   c = [c1+y1(1)-rho*d1_av(1),y1(2)-rho*d1_av(2)];
-   A = [-k11 -k12; -1 0; 1 0];
-   b = [o1-L1, 0, 100];
-   d1_ = quadprog(Q,c,A,b,[],[],[],[]);
+%    Q = [q1+rho, 0; 0 rho];
+%    c = [c1+y1(1)-rho*d1_av(1),y1(2)-rho*d1_av(2)];
+%    A = [-k11 -k12; -1 0; 1 0];
+%    b = [o1-L1, 0, 100];
+%    d1_ = quadprog(Q,c,A,b,[],[],[],[]);
    %
    %compute average with available knowledge
-   d1_av = (d1+d2_copy)/2;
+   d1_av = (d1+d2_copy)/2
    %update local lagrangian
-   y1 = y1 + rho*(d1-d1_av);
+   y1 = y1 + rho*(d1-d1_av)
    % send node 1 solution to neighboors
    d1_copy = d1;
    
