@@ -68,7 +68,11 @@ void initialize_i2c(){
   gpioSetPullUpDown(19, PI_PUD_UP);
 
   eventSetFunc(PI_EVENT_BSC, i2c_handle_read);
+<<<<<<< HEAD
 
+=======
+  printf("HEY2\n");
+>>>>>>> b092f5e3b87996598c845959cd7bc1a6cf165516
 }
 
 
@@ -104,6 +108,10 @@ public:
     sock_.close(ignored_ec);
     KeepAlive_.cancel();
     
+<<<<<<< HEAD
+=======
+
+>>>>>>> b092f5e3b87996598c845959cd7bc1a6cf165516
     //heartbeat_timer_.cancel();
   }
 private:
