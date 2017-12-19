@@ -7,9 +7,9 @@ void setup() {
 }
 
 void loop() {
-    if(Serial.available()> 0){
+    if(Serial.available()){
       String data = "";
-      while(Serial.available())
+      while(Serial.available()>0)
       {
         data += (char) Serial.read();
       }
