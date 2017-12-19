@@ -72,16 +72,6 @@ void initialize_i2c(){
 }
 
 
-
-
-
-
-
-
-
-
-
-
 class connection
 {
 public:
@@ -113,6 +103,7 @@ public:
     boost::system::error_code ignored_ec;
     sock_.close(ignored_ec);
     KeepAlive_.cancel();
+    
 
     //heartbeat_timer_.cancel();
   }
