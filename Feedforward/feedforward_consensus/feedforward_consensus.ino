@@ -1,11 +1,12 @@
+// Library inclusions
+#include <Wire.h>
+
 // ------------------------ My global variables ----------------------------- //
 
-const int N_ELEMENTS = 2;
-int my_index = 0;
+const int N_ELEMENTS = 5;
 int found_elements = 2;
 
 struct arduino_info {int endereco; double ganho;};
-arduino_info elements[N_ELEMENTS] = {{0, 2}, {1, 1}};
 
 // System definition
 float Lmin[N_ELEMENTS] = {150,80};
@@ -15,7 +16,6 @@ float o[N_ELEMENTS] = {30,0};
 float c[N_ELEMENTS] = {1,1};
 float Q[N_ELEMENTS] = {1,1};
 
-
 // ADMM auxiliary variables
 float rho = 0.01;                       // ADMM penalty parameter
 float y[N_ELEMENTS];                    // Lagrange multipliers vector
@@ -23,6 +23,18 @@ float d[N_ELEMENTS];                    // Final (optimal) duty cycles, for loca
 float d_av[N_ELEMENTS];                 // Duty cycles average, for all arduinos
 float d_copies[N_ELEMENTS][N_ELEMENTS]; // Duty cycles buffer, for all arduinos
 
+// MUDAR PARA CADA ARDUINO              <-------------------
+int my_index = 0;                                           // 1
+arduino_info elements[N_ELEMENTS] = {{20, 2}, {21, 1}};     // {{20, 1}, {21, 2}}
+
+// Other variables
+union float_as_bytes {  byte b[4];   float fval;};
+float_as_bytes u[N_ELEMENTS*N_ELEMENTS];
+byte control = 1;
+
+int address = elements[my_index].endereco;
+int d_broadcast_count = 0;
+unsigned long t_0,diff,t0;
 
 // ---------------------------- My functions -------------------------------- //
 
@@ -237,7 +249,7 @@ void feedforwardConsensus(){
     float g = (rho+Q[my_index]) / (n*(rho+Q[my_index]) - (elements[my_index].ganho)*(elements[my_index].ganho));
     float v = 0;
     float kr2 = 0;
-    for(int i=1; i<found_elements; i++){
+    for(int i=0; i<found_elements; i++){
         if(i==my_index){
             continue;
         }
@@ -331,6 +343,7 @@ void feedforwardConsensus(){
     return;
 }
 
+
 void compute_d_av(){
     for(int j=0; j<found_elements; j++){
         d_av[j] = 0;
@@ -370,11 +383,163 @@ void update_y(){
     Serial.println("");
 }
 
+void update_d_copies(){
+    for(int i=0; i<found_elements; i++){
+        d_copies[my_index][i] = d[i];
+    }
+}
+
+
+// --------------------------- Other functions ------------------------------ //
+
+void receiveEvent(int numBytes){
+  String request="";
+
+  while(Wire.available()){
+    request += (char) Wire.read();
+  }
+
+  d_broadcast_count++;
+  analyse_request(request);
+}
+
+void analyse_request(String data){
+
+  switch(data[0]){
+   //
+   //  //CHANGE STATE
+   //  case 's':
+   //  int new_occupancy;
+   //  new_occupancy = data[1] - '0';
+   //  occupancy = new_occupancy;
+   //  while(control !=0){
+   //      Wire.beginTransmission(pi_address);
+   //      Wire.write("ack");
+   //      Wire.write('\0');
+   //      control= Wire.endTransmission(true);
+   //    }
+   //  break;
+   //
+   //  //ANSWER RASPBERRY PI
+   //  char send_desk;
+   //  send_desk = desk_number + '0';
+   //  char send_occupancy;
+   //  char temp[6];
+   //  case 'c': //send stream
+   //    if(data[1]== 'l'){
+   //      if (stream ==0 || stream ==1)
+   //        stream = 1; //initialize lux streaming
+   //     else
+   //        stream = 3; //initialize both lux and duty cycle streaming
+   //    }
+   //    else if(data[1]== 'd'){
+   //    if (stream ==0 || stream == 2)
+   //        stream = 2; //streams duty cycle values only
+   //     else
+   //        stream = 3; //streams both lux and duty cycle
+   //    }
+   //    break;
+   //
+   //    case 'd':
+   //    if(data[1]== 'l'){
+   //      if (stream ==0 || stream ==1)
+   //        stream = 0; //stops streaming
+   //     else
+   //        stream = 2; //streams duty cycle only
+   //    }
+   //    else if(data[1]== 'd'){
+   //    if (stream ==0 || stream == 2)
+   //        stream = 0; //stops all streaming
+   //     else
+   //        stream = 1; //streams lux only
+   //    }
+   //    break;
+   //
+   //    case 'g':
+   //    if(data[1]== 'l'){ //get lux
+   //    double lux_value = transform_ADC_in_lux(analogRead(LDRPin));
+   //    dtostrf(lux_value,4,2,temp);
+   //    while(control !=0){
+   //      Wire.beginTransmission(pi_address);
+   //      Wire.write("l");
+   //      Wire.write(send_desk);
+   //      Wire.write(temp, sizeof(temp)); //sends 6 bytes: size of array
+   //      Wire.write('\0');
+   //      control= Wire.endTransmission(true);
+   //    }
+   //    control = 1;
+   //    }
+   //    else if(data[1]== 'o'){
+   //      send_occupancy = occupancy + '0';
+   //      while(control !=0){
+   //      Wire.beginTransmission(pi_address);
+   //      Wire.write("o");
+   //      Wire.write(send_desk);
+   //      Wire.write(send_occupancy); //sends 6 bytes: size of array
+   //      Wire.write('\0');
+   //      control= Wire.endTransmission(true);
+   //    }
+   //    control = 1;
+   //    }
+   //
+   //    break;
+   //
+   //    case 't': //test if pi is receiving
+   //      Wire.beginTransmission(pi_address);
+   //      Wire.write("OK\0");
+   //      control= Wire.endTransmission(true);
+   //    break;
+   //
+   // //ANSWER ARDUINO
+   // case 'E':
+   //    elements[found_elements].endereco= data[1];
+   //    found_elements++;
+   //    t_0=micros();
+   //    break;
+   //
+   //  case 'C':
+   //    if (data[1]=='S'){
+   //      recolhe_valores=1;
+   //    }
+   //    if (data[1]=='E'){
+   //      recolhe_valores=0;
+   //      calibre_count++;
+   //    }
+   //    break;
+   //
+   //  case 'A':
+   //    acende = true;
+   //    break;
+
+    case 'D':
+    Serial.print("Received. Index = ");
+      int index = (data[1] - '0') -1; //origin desk number - 1
+      Serial.println(index);
+      //char data_receive[found_elements][4];
+
+       //RECEIVE DATA IN CHAR AND CHANGE IT TO FLOAT
+       for(int num_col = 0; num_col < found_elements; num_col ++){
+            for(int j=0; j<4; j++){ //4 bytes for each value
+                u[index*found_elements+num_col].b[j] = data[num_col*4+j+2];
+            }
+       }
+       for(int i = 0; i<found_elements; i++){
+        d_copies[index][i] = u[index*found_elements + i].fval;
+       }
+    break;
+  }
+}
+
 // --------------------------- Setup / Loop --------------------------------- //
 
 void setup() {
 
+    // Initialize Serial / I2C comunications
     Serial.begin(9600);
+    Wire.begin(address);
+    Wire.onReceive(receiveEvent);
+    bitSet(TWAR, TWGCE);            //Enable general call
+    delay(100);
 
     // System / cost function variables initialization
     // for(int i=0; i<found_elements; i++){
@@ -405,21 +570,59 @@ void setup() {
 
 void loop() {
 
-    // int iterations = 50;
-    // for(int i=0; i<iterations; i++){
+    int iterations = 5;
+    for(int i=0; i<iterations; i++){
 
         // compute duty-cycles vector, d
         feedforwardConsensus();
+        // update duty cycle array, d
+        update_d_copies();
         // compute average duty-cycles vector, d_av
         compute_d_av();
         // update local lagrangian, y
         update_y();
-        // broadcast / receive computed 'd' vectors
+        // ------------ broadcast / receive computed 'd' vectors ------------ //
+        // while(d_broadcast_count<found_elements){
+            if (elements[d_broadcast_count].endereco == address){
+                char send_mydesk;
+                int aux = my_index + 1;
+                send_mydesk = aux + '0';
+                while (control != 0){
+                  Wire.beginTransmission(0);
+                  Wire.write('D');
+                  Wire.write(send_mydesk);
+                  Wire.write((byte*) &d, 4*found_elements);
+                  control = Wire.endTransmission(true);
+                }
+                control=1;
+                d_broadcast_count++;
+            }
 
-    // }
+            t_0=micros();//Waits to ensure everything is read (se calhar considerar resposta para garantir comunicação)
+            diff=0;
+            while(diff<1000000){
+              diff=micros()-t_0;
+            }
+        // }
+        // d_broadcast_count = 0;
+        // ------------------------------------------------------------------ //
 
+        t_0=micros();//Waits to ensure everything is read (se calhar considerar resposta para garantir comunicação)
+        diff=0;
+        while(diff<1000000){
+          diff=micros()-t_0;
+      }
+        Serial.println("d_copies = ");
+    for(int i=0; i<found_elements; i++){
+        for(int j=0; j<found_elements; j++){
+            Serial.print(d_copies[i][j]);
+            Serial.print("\t");
+        }
+        Serial.print("\n");
+    }
+while(1);
+}
     // Serial.println("-----------------------------------");
     // Serial.println(" ");
     Serial.println("Done.");
-    while(1){}
 }

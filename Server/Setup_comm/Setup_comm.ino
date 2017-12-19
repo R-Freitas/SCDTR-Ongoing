@@ -87,6 +87,8 @@ void setup() {
     Serial.print("\t");
     Serial.println(j);
   }
+  Serial.print("\t");
+  Serial.print(desk_number);
    
 }
 
@@ -94,6 +96,7 @@ void loop() {
    if (Serial.available()>0){
     analyse_serial();
   }
+  
 
   /*
   Serial.print(" \n");
@@ -260,14 +263,15 @@ void analyse_serial(){
     data+=(char)Serial.read();
     delay(1);
   }
-  Serial.print("HEY2");
-  if(data.substring(data.lastIndexOf(' ')+1).toInt() > found_elements){
+  
+  if(data.substring(data.lastIndexOf(' ')+1).toInt() <= found_elements){
     if(data.substring(data.lastIndexOf(' ')+1).toInt()==desk_number){
       analyse_request(data);
     }
     
     else{
       msg="R " + data;
+      Serial.println("HEEY");
       send_to=elements[data.substring(data.lastIndexOf(' ')+1).toInt()-1].endereco;
       
       Wire.beginTransmission(send_to);
@@ -280,67 +284,68 @@ void analyse_serial(){
 }
 
 void analyse_request(String request){
+  Serial.print(request);
   String response="";
   switch(request[0]){
     case 'g':
       switch(request[2]){
         case 'l':
-          response="l "+request.substring(request.lastIndexOf(' ')+1)+ " lux(float)";
+          response="l "+request.substring(request.lastIndexOf(' ')+1,request.length()-1)+ " lux";
           break;
 
         case 'd':
-          response="d "+request.substring(request.lastIndexOf(' ')+1)+ " duty(float)";
+          response="d "+request.substring(request.lastIndexOf(' ')+1,request.length()-1)+ " duty";
           break;
           
         case 'o':
-          response="o "+request.substring(request.lastIndexOf(' ')+1)+ " ocupancy";
+          response="o "+request.substring(request.lastIndexOf(' ')+1,request.length()-1)+ " ocup";
           break;
           
         case 'L':
-          response="L "+request.substring(request.lastIndexOf(' ')+1)+ " L(float)";
+          response="L "+request.substring(request.lastIndexOf(' ')+1,request.length()-1)+ " L";
           break;
         
         case 'O':
-          response="O "+request.substring(request.lastIndexOf(' ')+1)+ " O(float)";
+          response="O "+request.substring(request.lastIndexOf(' ')+1,request.length()-1)+ " O";
           break;
 
         case 'r':
-          response="r "+request.substring(request.lastIndexOf(' ')+1)+ " reference(float)";
+          response="r "+request.substring(request.lastIndexOf(' ')+1,request.length()-1)+ " ref";
           break;
         
         case 'p':
           if (request[3]=='T'){
-            response="p T power(float)";
+            response="p T P";
           }
           else{
-            response="p "+request.substring(request.lastIndexOf(' ')+1)+ " power(float)";
+            response="p "+request.substring(request.lastIndexOf(' ')+1,request.length()-1)+ " P";
           }
           break;
         
         case 'e':
           if (request[3]=='T'){
-            response="e T energy(float)";
+            response="e T E";
           }
           else{
-            response="e "+request.substring(request.lastIndexOf(' ')+1)+ " energy(float)";
+            response="e "+request.substring(request.lastIndexOf(' ')+1,request.length()-1)+ " E";
           }
           break;
         
         case 'c':
           if (request[3]=='T'){
-            response="c T confort(float)";
+            response="c T conf)";
           }
           else{
-            response="c "+request.substring(request.lastIndexOf(' ')+1)+ " variance(float)";
+            response="c "+request.substring(request.lastIndexOf(' ')+1,request.length()-1)+ " conf";
           }
           break;
         
         case 'v':
           if (request[3]=='T'){
-            response="v T variance(float)";
+            response="v T var";
           }
           else{
-            response="v "+request.substring(request.lastIndexOf(' ')+1)+ " variance(float)";
+            response="v "+request.substring(request.lastIndexOf(' ')+1,request.length()-1)+ " var";
           }
           break;
         

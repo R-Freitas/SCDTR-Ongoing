@@ -2,16 +2,18 @@ close all, clear all; clc;
 
 %The system
 k11 = 2; k12 = 1; k21 = 1; k22 = 2;
+% k11 = 1.62; k12 = 0.38; k21 = 0.37; k22 = 2.51;
 L1 = 150; o1 = 30; L2 = 80; o2 = 0;
+% L1 = 120; o1 = 0.06; L2 = 70; o2 = 0.06;
 K = [k11, k12 ; k21 , k22];
 L = [L1;L2]; o = [o1;o2];
 
-%The cost function
+%The cost functio
 c1 = 1; c2 = 1; q1 = 1; q2 = 1;
 c = [c1 c2]; Q = [q1 0; 0 q2];
 
 % SOLVE WITH CONSENSUS
-rho = 0.01;
+rho = 1.2;
 %node 1 initialization
 d1 = [0;0];
 d1_av = [0;0];
@@ -25,7 +27,8 @@ d1_copy = [0;0];
 y2 = [0;0];
 k2 = [k21;k22]; 
 %iterations
-for i=1:50,
+iterations = 20;
+for i=1:iterations,
    % node 1
    d11_best = -1;
    d12_best = -1;
@@ -157,7 +160,7 @@ for i=1:50,
        if min_linear_100 < min_best_1(i),
            d11_best = d11u;
            d12_best = d12u;
-           min_best_1_(i) = min_linear100;
+           min_best_1_(i) = min_linear_100;
        end;
    end;
    %store data and save for next cycle
@@ -312,7 +315,7 @@ for i=1:50,
        if min_linear_100 < min_best_2(i),
            d21_best = d21u;
            d22_best = d22u;
-           min_best_2(i) = min_linear100;
+           min_best_2(i) = min_linear_100;
        end;
    end;
    %store data and save for next cycle
@@ -350,7 +353,8 @@ d_ = d2_av
 l_ = K*d_+o
 %Plots
 figure(10);
-plot(1:50, av1, 1:50, av2);
+plot(1:iterations, av1, 1:iterations, av2);
+grid minor
 legend('d_1','d_2');
 title('primal vars');
 xlabel('iter');

@@ -42,16 +42,17 @@ void i2c_handle_read (int event, uint32_t tick){
   status = bscXfer(&xfer);
   if(xfer.rxCnt !=0)
   {
-
     std::cout<< xfer.rxBuf<< std::endl;
     std::cout<< "Recebido " << xfer.rxCnt << " bytes" << std::endl;
   }
 }
 
 void i2c_read(){
-  bscXfer(&xfer);
-  for(;;)
+for(;;)
   {
+    bscXfer(&xfer);
+    xfer.txCnt=0;
+    sleep(600);
     if (stopped_){
       return;
     }
