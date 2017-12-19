@@ -68,18 +68,8 @@ void initialize_i2c(){
   gpioSetPullUpDown(19, PI_PUD_UP);
 
   eventSetFunc(PI_EVENT_BSC, i2c_handle_read);
-  printf("HEY2\n");
+
 }
-
-
-
-
-
-
-
-
-
-
 
 
 class connection
@@ -113,7 +103,7 @@ public:
     boost::system::error_code ignored_ec;
     sock_.close(ignored_ec);
     KeepAlive_.cancel();
-
+    
     //heartbeat_timer_.cancel();
   }
 private:
@@ -357,8 +347,8 @@ bool is_command_valid(std::string &new_line){
   return false;
 }
 void empty_handle_error(const boost::system::error_code& ec){
-  if (!ec){
-    printf("Erro a enviar mensagem de erro para o client\n");
+  if (ec){
+    printf("Error when contacting client\n");
   }
 }
 
