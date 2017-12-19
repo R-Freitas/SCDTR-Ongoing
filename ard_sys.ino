@@ -1,116 +1,90 @@
 #include <Wire.h>
 #include <stdlib.h>
-#define N_ELEMENTS 4
 
+const int N_ELEMENTS = 2;
 const int LedPin = 9;
 const int LDRPin = A0;
 
+union float_as_bytes {
+  byte b[4]; 
+  float fval;};
 
 struct arduino_info {
   int endereco;
   double ganho;
 };
 
+//Sample time
+double T_s  = 0.03;
 
 
-arduino_info elements[N_ELEMENTS];
+//CONTROLER VARIABLES
+float error_0 = 0;     // (k)-th error value [lux]
+float error_1 = 0;     // (k-1)-th error value [lux] 
+float outputValue_1 = 0; // (k-1)-th value output to the PWM (analog out)
+float I = 0;
+float I_1 = 0;
+float D = 0;
+float D_1 = 0;
+float P = 0;
+float C = 0;
+int ff_value = 0;
+
+//CONTROLER CONSTANTS
+double Kp = 0.7;
+double Ki = 25;
+double Kc = 1;
+double Kd = 0;
+int a = 10;
+int u =0;
+
+//I2C VARIABLES
 int address=0;
 int pi_address = 9;
 int found_elements=1;
 byte control=1;
-bool acende = 0;
-int desk_number;
 int stream =0;
-unsigned long t_0,diff,t0;
+int desk_number;
+int my_index= -1;
+
+//CALIBRATION VARIABLES
 int recolhe_valores=0, calibre_count=0;
 int PWM_Calibre=255;
+arduino_info elements[N_ELEMENTS];
+
+//Others
+bool acende = 0;
+unsigned long t_0,diff,t0; //time variables
+float_as_bytes buf[N_ELEMENTS*N_ELEMENTS];
+
+//STATE VARIABLES
 int occupancy = 0; //0 for false and 1 for true
 
 
-void setup() {
+//Consensus global variables
+int d_broadcast_count= 0;
 
-  int n=0;
-  
-  
-  Serial.begin(9600);
-  Serial.println("Begin Setup");
-  pinMode(LED_BUILTIN, OUTPUT);
-  pinMode(2,INPUT_PULLUP);
-  pinMode(3,INPUT_PULLUP);
-  pinMode(4,INPUT_PULLUP);
-  pinMode(5,INPUT_PULLUP);
-  pinMode(6,INPUT_PULLUP);
-  pinMode(7,INPUT_PULLUP);
-  pinMode(8,INPUT_PULLUP);
-  
-  digitalWrite(LED_BUILTIN,HIGH);
-  delay(500);
-  digitalWrite(LED_BUILTIN,LOW);
+// System definition
+float Lmin[N_ELEMENTS] = {150,80};
+float o[N_ELEMENTS] = {30,0};
 
-  
-  // Various initialization processes needed (such as reading adress pins, enabling general call, and using builtin led for control purposes)
+// Cost function definition
+float c[N_ELEMENTS] = {1,1};
+float Q[N_ELEMENTS] = {1,1};
 
-  for (int i=2; i <= 8; i++){
-    bitWrite(address, n, !digitalRead(i));
-    n++;
-  }//reading the address coded in digital ports from 2 to 8
-  
-  elements[0].endereco=address;  //Saving own address
-  Wire.begin(address);  //Initialize I2C comunication
-  bitSet(TWAR, TWGCE);  //Enable general call
-  Wire.onReceive(receiveEvent);
 
-  delay(100);
-  
-  propagate_address(address);               //Propagates the address so its know by everyone
-  
-  t_0=micros();
-  while(diff<500000)
-  {
-    diff=micros()-t_0;
-  }
-  
-  sort_copy(&elements[0],found_elements);   //Sort found addresses for use in calibration
-  calibracao(&elements[0],found_elements);  //Calibration
-  Serial.println("Setup ended");
-  //analogWrite(LedPin,PWM_Calibre);
-  t0 = millis();
-   
-}
+// ADMM auxiliary variables
+float rho = 0.01;                       // ADMM penalty parameter
+float y[N_ELEMENTS];                    // Lagrange multipliers vector
+float d[N_ELEMENTS];                    // Final (optimal) duty cycles, for local arduino
+float d_av[N_ELEMENTS];                 // Duty cycles average, for all arduinos
+float d_copies[N_ELEMENTS][N_ELEMENTS]; // Duty cycles buffer, for all arduinos
 
-void loop() {
+/*
+// MUDAR PARA CADA ARDUINO              <-------------------
+int my_index = 0;                                           // 1
+arduino_info elements[N_ELEMENTS] = {{20, 2}, {21, 1}};     // {{20, 1}, {21, 2}}*/
 
-  if(Serial.available()> 0){
-    analyse_serial();
-  }
-  
-  if(acende==true){
-  digitalWrite(LED_BUILTIN,HIGH);
-  delay(500);
-  digitalWrite(LED_BUILTIN,LOW);    
-  acende = false;
-  }
-
-  /*
-  Serial.print(" \n");
-  for (int j=0;j<found_elements;j++){
-    Serial.print("Endereco: ");
-    Serial.print(elements[j].endereco);
-    Serial.print("\t");
-    Serial.print("Ganho: ");
-    Serial.print(elements[j].ganho);
-    Serial.print("\t");
-    Serial.println(j);
-    Serial.println(transform_ADC_in_lux(analogRead(LDRPin)));
-  }*/
-  
-  delay(500);
-
-  if(stream !=0){
-    streaming();
-  }
-  
-}
 
 void analyse_serial(){
 
@@ -119,7 +93,8 @@ void analyse_serial(){
     data += (char) Serial.read();
   }
 
-  Serial.println(data);  
+  Serial.println(data);
+  Serial.print(sizeof(data));  
   //data = Serial.readString();
 
   if(sizeof(data)>1){
@@ -128,26 +103,17 @@ void analyse_serial(){
       analyse_request(data);
     }
     else{
-      int send_to = elements[received_ad-1].endereco;
-      while(control !=0){
-        Wire.beginTransmission(send_to);
-        Wire.write(data.c_str());
-        control= Wire.endTransmission(true);
-      }
+      if(elements[received_ad-1].endereco){ //checks if the desk_number exists
+        int send_to = elements[received_ad-1].endereco;
+        while(control !=0){
+          Wire.beginTransmission(send_to);
+          Wire.write(data.c_str());
+          control= Wire.endTransmission(true);
+        }
       control = 1;
-    }
+      }
   }
- 
  }
-
-void receiveEvent(int numBytes){
-  String request="";
-  
-  while(Wire.available()){
-    request += (char) Wire.read();
-  }
-
-  analyse_request(request);
 }
 
 void sort_copy (arduino_info* arr, int size){
@@ -164,15 +130,14 @@ void sort_copy (arduino_info* arr, int size){
 
 }
 
-void sampleADC(arduino_info* arr)
-{ 
+double sampleADC(){ 
   double Value = 0;
   for (int k=0;k<10;k++)
   {
     Value += analogRead(LDRPin);
   } 
   Value /= 10;
-  arr[0].ganho=Value;
+  return Value;
 }
 
 void calibracao (arduino_info* elements, int found_elements){
@@ -181,6 +146,7 @@ void calibracao (arduino_info* elements, int found_elements){
   while (calibre_count<found_elements){
     if (elements[calibre_count].endereco == address){
       desk_number = calibre_count +1;
+      my_index = calibre_count;
       analogWrite(LedPin,PWM_Calibre);  //liga led
       
       t_0=micros();//Waits to ensure everything is read (se calhar considerar resposta para garantir comunicação)
@@ -195,8 +161,8 @@ void calibracao (arduino_info* elements, int found_elements){
         control = Wire.endTransmission(true); 
       }
       control=1;
-      
-      sampleADC(&elements[calibre_count]);  //Lê valores
+
+      elements[calibre_count].ganho = sampleADC();  //Lê valores
       
       t_0=micros();//Waits to ensure everything is read (se calhar considerar resposta para garantir comunicação)
       diff=0;
@@ -219,7 +185,7 @@ void calibracao (arduino_info* elements, int found_elements){
     else{
       if (recolhe_valores == 1){
         digitalWrite(LED_BUILTIN,HIGH);
-        sampleADC(&elements[calibre_count]);
+        elements[calibre_count].ganho = sampleADC();
         //talvez apenas evocar uma vez, discutir com o duarte ou seja apos o adc meter recolhe_valores=0
       }
       digitalWrite(LED_BUILTIN,LOW);
@@ -227,7 +193,7 @@ void calibracao (arduino_info* elements, int found_elements){
   
   }
   for (int i=0;i<found_elements;i++){
-    elements[i].ganho=transform_ADC_in_lux(elements[i].ganho)/PWM_Calibre;
+    elements[i].ganho=(transform_ADC_in_lux(elements[i].ganho)/PWM_Calibre)*100;
   }
 }
 
@@ -255,11 +221,32 @@ double transform_ADC_in_lux(double sensorValue){
   
 }
 
+void receiveEvent(int numBytes){
+  String request="";   
+  
+  while(Wire.available()){
+    request += (char) Wire.read();
+  }
+
+  analyse_request(request);
+}
+
 void analyse_request(String data){
 
   switch(data[0]){
 
     //CHANGE STATE
+    case 's':
+    int new_occupancy;
+    new_occupancy = data[1] - '0';
+    occupancy = new_occupancy;
+    while(control !=0){
+        Wire.beginTransmission(pi_address);
+        Wire.write("ack");
+        Wire.write('\0');
+        control= Wire.endTransmission(true);
+      }
+    break;
     
     //ANSWER RASPBERRY PI
     char send_desk;
@@ -350,12 +337,27 @@ void analyse_request(String data){
 
     case 'A':   
       acende = true;
-      break; 
+      break;
+
+    case 'D':
+      int index = (data[1] - '0') -1; //origin desk number - 1
+
+       //RECEIVE DATA IN CHAR AND CHANGE IT TO FLOAT
+       for(int num_col = 0; num_col < found_elements; num_col ++){ 
+       for(int j=0; j<4; j++){ //4 bytes for each value
+        buf[index*found_elements+num_col].b[j] = data[num_col*4+j+2];
+      } 
+       }
+       for(int i = 0; i<found_elements; i++){
+        d_copies[index][i] = buf[index*found_elements + i].fval;
+       }
+       d_broadcast_count++;
+    break;
   }
 }
 
 void streaming(){
-  double lux_value;
+    double lux_value;
     char pwm_value;
     char temp[6];
     char temp2[6];
@@ -434,4 +436,566 @@ void streaming(){
  }
   
 }
+
+// ---------------------------- Consensus functions -------------------------------- //
+
+float local_lux(float *d){
+    float L = o[my_index];    // unconstrained solution illuminance at local desk
+    for(int i=0; i<found_elements; i++){
+        L += (elements[i].ganho)*d[i];
+    }
+    return L;
+}
+
+float cost_function(float *d){
+    float f = 0;
+    f = 0.5*Q[my_index]*d[my_index]*d[my_index]
+      + c[my_index]*d[my_index];
+    for(int i=0; i<found_elements; i++){
+        f += y[i]*(d[i]-d_av[i])
+           + 0.5*rho*(d[i]-d_av[i])*(d[i]-d_av[i]);
+    }
+    return f;
+}
+
+void feedforwardConsensus(){
+
+    // ---------------------------------------------------------------------- //
+    //                  1) Compute unconstrained solution
+    // ---------------------------------------------------------------------- //
+
+  float z[found_elements];
+    float d_unconstrained[found_elements];
+    for(int i=0; i<found_elements; i++){
+        if(i!=my_index){
+      z[i] = rho*d_av[i]-y[i];
+            d_unconstrained[i] = z[i]/rho;
+        }
+        else if(i==my_index){
+      z[i] = rho*d_av[i]-y[i]-c[i];
+            d_unconstrained[i] = z[i]/(Q[i]+rho);
+        }
+  }
+
+    // ------------------- Check solution feasibility ----------------------- //
+
+    float L_unconstrained = local_lux(d_unconstrained);
+    if ((d_unconstrained[my_index]>=0) &&
+        (d_unconstrained[my_index]<=100) &&
+        (L_unconstrained>=Lmin[my_index]-o[my_index]) ){
+        for(int i=0; i<found_elements; i++){
+            d[i] = d_unconstrained[i];    // The unconstrained solution is the
+            return;                       // optimal solution - all done!
+    }
+    }
+
+    // ---------------------- DEBUG (unconstrained)  ------------------------ //
+    //
+    float f_unconstrained = cost_function(d_unconstrained);
+    for(int i=0; i<found_elements; i++){
+        Serial.println(d_unconstrained[i]);
+    }
+    Serial.println(f_unconstrained);
+    Serial.println(" ");
+    //
+    // ---------------------------------------------------------------------- //
+
+    // ---------------------------------------------------------------------- //
+    //       2) Compute best solution on the boundary - Initialization
+    // ---------------------------------------------------------------------- //
+
+    // Cost function minima for each of the boundary regions
+    float f_linear = 0;
+    float f_dcmin = 0;
+    float f_dcmax = 0;
+    float f_linear_dcmin = 0;
+    float f_linear_dcmax = 0;
+    float f_best = 100000;
+    float d_best[found_elements];
+
+    // ---------------------------------------------------------------------- //
+    //    2.1) Compute best solution on the boundary - Linear constraint
+    // ---------------------------------------------------------------------- //
+
+    float n = 0;
+    float w1 = 0;
+    for(int i=0; i<found_elements; i++){
+        if(i!=my_index){
+            n += (elements[i].ganho)*(elements[i].ganho)/rho;
+            w1 -= (elements[i].ganho)*z[i]/rho;
+        }
+        else if(i==my_index){
+            n += (elements[i].ganho)*(elements[i].ganho)/(Q[i]+rho);
+            w1 -= (elements[i].ganho)*z[i]/(Q[i]+rho);
+        }
+    }
+
+    float d_linear[found_elements];
+    for(int i=0; i<found_elements; i++){
+        if(i!=my_index){
+            d_linear[i] = z[i]/rho - (elements[i].ganho)*(o[my_index]-Lmin[my_index]-w1)/(n*rho);
+        }
+        else if(i==my_index){
+            d_linear[i] = z[i]/(Q[i]+rho) - (elements[i].ganho)*(o[my_index]-Lmin[my_index]-w1)/(n*(Q[i]+rho));
+        }
+  }
+
+    // ----- Check solution feasibility / get cost function value ----------- //
+
+    float L_linear = local_lux(d_linear);
+    if ((d_linear[my_index]>=0) &&
+        (d_linear[my_index]<=100)){
+        f_linear = cost_function(d_linear);
+        if(f_linear<f_best){
+            f_best = f_linear;
+            for(int i=0; i<found_elements; i++){
+                d_best[i] = d_linear[i];
+            }
+        }
+    }
+
+    // ------------------------  DEBUG (linear)  ---------------------------- //
+    //
+    f_linear = cost_function(d_linear);
+    for(int i=0; i<found_elements; i++){
+        Serial.println(d_linear[i]);
+    }
+    Serial.println(f_linear);
+    Serial.println(" ");
+    //
+    // ---------------------------------------------------------------------- //
+
+    // ---------------------------------------------------------------------- //
+    //     2.2) Compute best solution on the boundary - dcmin constraint
+    // ---------------------------------------------------------------------- //
+
+    float d_dcmin[found_elements];
+    for(int i=0; i<found_elements; i++){
+        if(i!=my_index){
+            d_dcmin[i] = z[i]/rho;
+        }
+        else if(i==my_index){
+            d_dcmin[i] = 0;
+        }
+  }
+
+    // ----- Check solution feasibility / get cost function value ----------- //
+
+    float L_dcmin = local_lux(d_dcmin);
+    if ((d_dcmin[my_index]<=100) &&
+        (L_dcmin>=Lmin[my_index]-o[my_index]) ){
+        f_dcmin = cost_function(d_dcmin);
+        if(f_dcmin<f_best){
+            f_best = f_dcmin;
+            for(int i=0; i<found_elements; i++){
+                d_best[i] = d_dcmin[i];
+            }
+        }
+    }
+
+    // -------------------------  DEBUG (dcmin)  ---------------------------- //
+    //
+    f_dcmin = cost_function(d_dcmin);
+    for(int i=0; i<found_elements; i++){
+        Serial.println(d_dcmin[i]);
+    }
+    Serial.println(f_dcmin);
+    Serial.println(" ");
+    //
+    // ---------------------------------------------------------------------- //
+
+    // ---------------------------------------------------------------------- //
+    //     2.3) Compute best solution on the boundary - dcmax constraint
+    // ---------------------------------------------------------------------- //
+
+    float d_dcmax[found_elements];
+    for(int i=0; i<found_elements; i++){
+        if(i!=my_index){
+            d_dcmax[i] = z[i]/rho;
+        }
+        else if(i==my_index){
+            d_dcmax[i] = 100;
+        }
+  }
+
+    // ------------------- Check solution feasibility ----------------------- //
+
+    float L_dcmax = local_lux(d_dcmax);
+    if ((d_dcmax[my_index]>=0) &&
+        (L_dcmax>=Lmin[my_index]-o[my_index]) ){
+        f_dcmax = cost_function(d_dcmax);
+        if(f_dcmax<f_best){
+            f_best = f_dcmax;
+            for(int i=0; i<found_elements; i++){
+                d_best[i] = d_dcmax[i];
+            }
+        }
+    }
+
+    // -------------------------  DEBUG (dcmax)  ---------------------------- //
+    //
+    f_dcmax = cost_function(d_dcmax);
+    for(int i=0; i<found_elements; i++){
+        Serial.println(d_dcmax[i]);
+    }
+    Serial.println(f_dcmax);
+    Serial.println(" ");
+    //
+    // ---------------------------------------------------------------------- //
+
+    // ---------------------------------------------------------------------- //
+    // 2.4) Compute best solution on the boundary: linear and dcmin constraints
+    // ---------------------------------------------------------------------- //
+
+    float g = (rho+Q[my_index]) / (n*(rho+Q[my_index]) - (elements[my_index].ganho)*(elements[my_index].ganho));
+    float v = 0;
+    float kr2 = 0;
+    for(int i=1; i<found_elements; i++){
+        if(i==my_index){
+            continue;
+        }
+        else{
+            v   += z[i]*elements[i].ganho;
+            kr2 += (elements[i].ganho)*(elements[i].ganho);
+        }
+    }
+
+    float d_linear_dcmin[found_elements];
+    for(int i=0; i<found_elements; i++){
+        if(i!=my_index){
+            d_linear_dcmin[i] = z[i]/rho + g*((elements[i].ganho)*(Lmin[my_index]-o[my_index]-v/rho))/rho;
+        }
+        else if(i==my_index){
+            d_linear_dcmin[i] = z[i]/(Q[i]+rho) - g*(kr2*z[i]/(Q[i]+rho))/rho; // <----- BUG: solved, wrong sign in the handout
+        }
+  }
+
+    // ------------------- Check solution feasibility ----------------------- //
+
+    float L_linear_dcmin = local_lux(d_linear_dcmin);
+    if (d_linear_dcmin[my_index]<=100){
+        f_linear_dcmin = cost_function(d_linear_dcmin);
+        if(f_linear_dcmin<f_best){
+            f_best = f_linear_dcmin;
+            for(int i=0; i<found_elements; i++){
+                d_best[i] = d_linear_dcmin[i];
+            }
+        }
+    }
+
+    // ----------------------- DEBUG (linear, dcmin)  ----------------------- //
+    //
+    f_linear_dcmin = cost_function(d_linear_dcmin);
+    for(int i=0; i<found_elements; i++){
+        Serial.println(d_linear_dcmin[i]);
+    }
+    Serial.println(f_linear_dcmin);
+    Serial.println(" ");
+    //
+    // ---------------------------------------------------------------------- //
+
+    // ---------------------------------------------------------------------- //
+    // 2.5) Compute best solution on the boundary: linear and dcmax constraints
+    // ---------------------------------------------------------------------- //
+
+    float d_linear_dcmax[found_elements];
+    for(int i=0; i<found_elements; i++){
+        if(i!=my_index){
+            d_linear_dcmax[i] = d_linear_dcmin[i] - 100*(elements[i].ganho)*(elements[my_index].ganho)*g/rho;
+        }
+        else if(i==my_index){
+            d_linear_dcmax[i] = d_linear_dcmin[i] + 100*kr2;
+        }
+  }
+
+    // ------------------- Check solution feasibility ----------------------- //
+
+    float L_linear_dcmax = local_lux(d_linear_dcmax);
+    if (d_linear_dcmax[my_index]>=0){
+        f_linear_dcmax = cost_function(d_linear_dcmax);
+        if(f_linear_dcmax<f_best){
+            f_best = f_linear_dcmax;
+            for(int i=0; i<found_elements; i++){
+                d_best[i] = d_linear_dcmax[i];
+            }
+        }
+    }
+
+    // ----------------------- DEBUG (linear, dcmax)  ----------------------- //
+    //
+    f_linear_dcmax = cost_function(d_linear_dcmax);
+    for(int i=0; i<found_elements; i++){
+        Serial.println(d_linear_dcmax[i]);
+    }
+    Serial.println(f_linear_dcmax);
+    Serial.println(" ");
+    //
+    // ---------------------------------------------------------------------- //
+
+    // ---------------------------------------------------------------------- //
+    //              2.6) Retrieve best solution on the boundary
+    // ---------------------------------------------------------------------- //
+
+    for(int i=0; i<found_elements; i++){
+        d[i] = d_best[i];
+    }
+
+    // Serial.println(f_best);
+    return;
+}
+
+void compute_d_av(){
+    for(int j=0; j<found_elements; j++){
+        d_av[j] = 0;
+        for(int i=0; i<found_elements; i++){
+            if(i!=my_index){
+                d_av[j] += d_copies[i][j];
+            }
+            else if(i==my_index){
+                d_av[j] += d[j];
+            }
+        }
+        d_av[j] /= found_elements;
+        // ----------- DEBUG ------------ //
+        Serial.print("d(");
+        Serial.print(j);
+        Serial.print(") = ");
+        Serial.print(d[j]);
+        Serial.print("\t\t d_av(");
+        Serial.print(j);
+        Serial.print(") = ");
+        Serial.println(d_av[j]);
+        // ----------------------------- //
+    }
+    Serial.println("");
+}
+
+void update_y(){
+    for(int i=0; i<found_elements; i++){
+        y[i] += rho*(d[i]-d_av[i]);
+        // ----------- DEBUG ------------ //
+        Serial.print("y(");
+        Serial.print(i);
+        Serial.print(") = ");
+        Serial.println(y[i]);
+        // ----------------------------- //
+    }
+    Serial.println("");
+}
+
+void update_d_copies(){
+    for(int i=0; i<found_elements; i++){
+        d_copies[my_index][i] = d[i];
+    }
+}
+
+float PI_controler(float Lref, float measured_lux, float ff_value){
+
+  float outputValue_0;
+  error_0 = Lref - measured_lux;
+
+if (abs(error_0) < 2)
+{
+  error_0 = 0;
+}
+
+//P Controller
+
+P = Kp*error_0;
+
+//PI Controller
+
+I = I_1 + 0.5*Kp*Ki*T_s*(error_0 + error_1);
+
+//PD Controller
+
+D = (Kd/(Kd+a*T_s))*D_1 - Kp*Kd*a*(outputValue_0-outputValue_1)/(Kd + a*T_s);
+
+//Complete Controller
+
+C = P + I ;
+
+outputValue_0 = C + ff_value;
+
+if(outputValue_0  < 0)
+{
+  outputValue_0 = 0;
+  u = 0;
+  I_1 = I + Kc*(u-C-ff_value);
+}
+else if(outputValue_0 > 255)
+{
+  outputValue_0 = 255;
+  u = 255;
+  I_1 = I + Kc*(u-C-ff_value);
+}
+else{
+  I_1 = I;
+}
+
+
+outputValue_1 = outputValue_0;
+error_1 = error_0;
+D_1 = D;
+
+return outputValue_0;  //Value to write in the led
+}
+
+
+void setup() {
+
+  int n=0;
+  
+  
+  Serial.begin(9600);
+  Serial.println("Begin Setup");
+  pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(2,INPUT_PULLUP);
+  pinMode(3,INPUT_PULLUP);
+  pinMode(4,INPUT_PULLUP);
+  pinMode(5,INPUT_PULLUP);
+  pinMode(6,INPUT_PULLUP);
+  pinMode(7,INPUT_PULLUP);
+  pinMode(8,INPUT_PULLUP);
+  
+  digitalWrite(LED_BUILTIN,HIGH);
+  delay(500);
+  digitalWrite(LED_BUILTIN,LOW);
+
+  
+  // Various initialization processes needed (such as reading adress pins, enabling general call, and using builtin led for control purposes)
+
+  for (int i=2; i <= 8; i++){
+    bitWrite(address, n, !digitalRead(i));
+    n++;
+  }//reading the address coded in digital ports from 2 to 8
+  
+  elements[0].endereco=address;  //Saving own address
+  Wire.begin(address);  //Initialize I2C comunications
+  Wire.onReceive(receiveEvent);
+  bitSet(TWAR, TWGCE);  //Enable general call
+  delay(100);
+  
+  propagate_address(address);               //Propagates the address so its know by everyone
+  
+  t_0=micros();
+  while(diff<500000)
+  {
+    diff=micros()-t_0;
+  }
+  
+  sort_copy(&elements[0],found_elements);   //Sort found addresses for use in calibration
+  calibracao(&elements[0],found_elements);  //Calibration
+  
+     // CONSENSUS: System / cost function variables initialization
+     for(int i=0; i<found_elements; i++){
+         //Lmin[i] = 160;
+         c[i] = 1;           // Unit cost, equal for all luminaires
+         Q[i] = 1;           // Unit cost, equal for all luminaires
+     }
+      
+    // CONSENSUS : ADMM auxiliary variables initialization
+    for(int i=0; i<found_elements; i++){
+        y[i] = 0;
+        d[i] = 0;
+        d_av[i] = 0;
+        for(int j=0; j<found_elements; j++){
+            d_copies[i][j] = 0;
+        }
+    }
+    
+  Serial.println("Setup ended");
+  //analogWrite(LedPin,PWM_Calibre);
+  t0 = millis();
+}
+
+
+void loop() {
+
+  if(Serial.available()> 0){
+    analyse_serial();
+  }
+
+  if(acende==true){
+  digitalWrite(LED_BUILTIN,HIGH);
+  delay(500);
+  digitalWrite(LED_BUILTIN,LOW);    
+  acende = false;
+  }
+
+  //CONSENSUS CALCULATIONS
+  
+  /*int iterations = 20;
+  
+    for(int i=0; i<iterations; i++){
+    
+      // compute duty-cycles vector, d
+      feedforwardConsensus();
+      // update duty cycle array, d
+      update_d_copies();
+      // compute average duty-cycles vector, d_av
+      compute_d_av();
+      // update local lagrangian, y
+      update_y();
+      // ------------ broadcast / receive computed 'd' vectors ------------ //
+      while(d_broadcast_count<found_elements){
+        t_0=micros();
+        diff=0;
+        while(diff<10){
+          diff=micros()-t_0;    
+        }
+        //
+           if (elements[d_broadcast_count].endereco == address){
+               char send_mydesk;
+               int aux = my_index + 1;
+               send_mydesk = aux + '0';
+               while(control !=0){
+                 Wire.beginTransmission(0);
+                 Wire.write('D');
+                 Wire.write(send_mydesk);
+                 Wire.write((byte*) &d, 4*found_elements);
+                 control = Wire.endTransmission(true);
+               }
+               control = 1;
+               d_broadcast_count++;
+           }
+           }
+          d_broadcast_count = 0;
+          Serial.println("d_copies = ");
+          for(int i=0; i<found_elements; i++){
+          for(int j=0; j<found_elements; j++){
+       Serial.print(d_copies[i][j]);
+       Serial.print("\t");
+      }
+      Serial.print("\n");
+      // ------------------------------------------------------------------ //
+    }
+      }
+      
+      while(1);*/
+ 
+  
+  
+
+
+  Serial.print(" \n");
+  for (int j=0;j<found_elements;j++){
+    Serial.print("Endereco: ");
+    Serial.print(elements[j].endereco);
+    Serial.print("\t");
+    Serial.print("Ganho: ");
+    Serial.print(elements[j].ganho);
+    Serial.print("\t");
+    Serial.println(j);
+    Serial.println(transform_ADC_in_lux(analogRead(LDRPin)));
+  }
+  
+  delay(500);
+
+  if(stream !=0){
+    streaming();
+  }
+  
+}
+
 
