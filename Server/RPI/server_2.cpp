@@ -46,19 +46,17 @@ void i2c_handle_read (int event, uint32_t tick){
     std::cout<< "Recebido " << xfer.rxCnt << " bytes" << std::endl;
   }
 }
-
 void i2c_read(){
-for(;;)
-  {
-    bscXfer(&xfer);
-    xfer.txCnt=0;
-    sleep(600);
-    if (stopped_){
-      return;
+    for(;;)
+      {
+        bscXfer(&xfer);
+        xfer.txCnt=0;
+        sleep(600);
+        if (stopped_){
+          return;
+        }
+      }
     }
-  }
-}
-
 void initialize_i2c(){
   xfer.control = (0x09<<16) | 0x305;
 
@@ -87,15 +85,10 @@ public:
     return sock_;
   }
 
-  void start()
-  { //Iniciates the various processes
-
+  void start(){ //Iniciates the various processes
     start_KeepAlive();
     start_serial();
     start_read_connection();
-    initialize_i2c();
-    thread t (i2c_read);
-    t.detach();
   }
 
   void stop(){
@@ -103,10 +96,11 @@ public:
     boost::system::error_code ignored_ec;
     sock_.close(ignored_ec);
     KeepAlive_.cancel();
-    
-
+    io.stop();
     //heartbeat_timer_.cancel();
   }
+
+
 private:
   tcp::socket sock_;
   boost::asio::deadline_timer KeepAlive_;
@@ -116,8 +110,6 @@ private:
   serial_port SPort;
   std::string msg_;
 
-
-
   void start_serial(){
     //Function to initialize serial comunication
     boost::system::error_code error;
@@ -126,16 +118,13 @@ private:
     SPort.set_option(serial_port_base::baud_rate(9600),error);
     if( error ) {cout << "Error when initializing connection to Arduino \n"; return ;}
   }
-
   void start_KeepAlive(){
     if (stopped_){
       return;
     }
-
     else{
     async_write(sock_, buffer("\n",1),
     boost::bind(&connection::handle_KeepAlive, this, _1));
-
     }
   }
   void handle_KeepAlive(const boost::system::error_code& ec){
@@ -157,7 +146,6 @@ private:
         boost::bind(&connection::handle_read_connection, this, _1));
 
   }
-
   void handle_read_connection(const boost::system::error_code& ec){
     if (stopped_)
       return;
@@ -181,7 +169,6 @@ private:
     }
     start_read_connection();
   }
-
   void handle_serial_send(std::string line){
     std::string terminated_line;
 
@@ -194,7 +181,6 @@ private:
 
 
   }
-
   void empty_handle_serial(const boost::system::error_code& ec){
     if (ec)
     {
@@ -352,7 +338,6 @@ void empty_handle_error(const boost::system::error_code& ec){
     printf("Erro a enviar mensagem de erro para o client\n");
   }
 }
-
 };
 
 class server
@@ -368,16 +353,14 @@ private:
   boost::asio::io_service& io_service_;
   tcp::acceptor acceptor_;
 
-  void start_accept()
-  {
+  void start_accept(){
     connection* new_connection = new connection(io_service_);
     acceptor_.async_accept(new_connection->socket(),
         boost::bind(&server::handle_accept, this, new_connection,
           boost::asio::placeholders::error));
   }
 
-  void handle_accept(connection* new_connection, const boost::system::error_code& ec)
-  {
+  void handle_accept(connection* new_connection, const boost::system::error_code& ec){
     if (!ec){
       new_connection->start();
       stopped_ = false;
@@ -387,8 +370,6 @@ private:
     }
     start_accept();
   }
-
-
 };
 
 
@@ -406,10 +387,9 @@ int main(int argc, char* argv[])
     }
 
     boost::asio::io_service io;
-
+    initialize_i2c();
+    thread t (i2c_read);
     server s(io, PORT);
-
-
     io.run();
   }
   catch (std::exception& e)
