@@ -24,12 +24,18 @@ using namespace boost::asio;
 
 bool stopped_;
 
+
+
+
+
+
 /*
 //I2C Variables
 #define SCL 19
 #define SDA 18
 #define ADDRESS 0x09
 bsc_xfer_t xfer;
+
 
 
 
@@ -70,6 +76,9 @@ void initialize_i2c(){
 }
 
 */
+//Class to manage the connection between client and server.
+//Handles the various assinchronous processes between client and
+//Arduino communication.
 class connection
 {
     public:
@@ -80,25 +89,34 @@ class connection
       {
       }
 
-      tcp::socket& socket()
-      {
+      tcp::socket& socket(){
         return sock_;
       }
 
-      void start(){ //Iniciates the various processes
+      //Functions to manage the server. Start it, end a connection with a client
+      //and kill the server. These functions are called acording to user commands
+      //from the client.
+
+
+      //Iniciates the various processes
+      void start_connection(){
         stopped_ = false;
         start_KeepAlive();
         start_serial();
         start_read_connection();
       }
 
-      void stop(){
+
+      //Stops the server and waits for another connection
+      void stop_connection(){
         stopped_ = true;
         boost::system::error_code ignored_ec;
         sock_.close(ignored_ec);
         KeepAlive_.cancel();
       }
 
+
+      //Shuts down the server, ending the various processes.
       void kill_server(){
         stopped_ = true;
         boost::system::error_code ignored_ec;
@@ -118,8 +136,8 @@ class connection
       std::string msg_;
 
 
+      //Function to initialize serial comunication
       void start_serial(){
-        //Function to initialize serial comunication
         boost::system::error_code error;
         SPort.open("/dev/ttyACM0", error); //connect to port containing arduino
         if( error ){
@@ -134,6 +152,27 @@ class connection
       }
 
 
+      //Function to schedule the process of serial communication with the Arduino.
+      void serial_send(std::string line){
+        std::string terminated_line;
+        std::cout << "Sending: " << line << "\n";
+        terminated_line = line + std::string("\n");
+        std::size_t n = terminated_line.size();
+        terminated_line.copy(send_buffer_, n);
+        boost::asio::async_write(SPort, boost::asio::buffer(send_buffer_,n),boost::bind(&connection::handle_serial_send, this, _1));
+      }
+
+
+      //Deals with possible errors from the serial communication.
+      void handle_serial_send(const boost::system::error_code& ec){
+        if (ec)
+        {
+          std::cout << "Error on serial communication to Arduino\n";
+        }
+      }
+
+
+      //Function to start the timer to send an heartbeat signal to the client.
       void start_KeepAlive(){
         if (stopped_){
           return;
@@ -144,6 +183,7 @@ class connection
       }
 
 
+      //Function that resets the timer eaxh time a heartbeat signal is sent.
       void handle_KeepAlive(const boost::system::error_code& ec){
         if (stopped_){
           return;
@@ -154,232 +194,214 @@ class connection
         }
         else{
           std::cout << "Client disconnected" << "\n";
-          stop();
+          stop_connection();
         }
       }
 
 
+      //Function that reads from the socket connection.
       void start_read_connection(){
         boost::asio::async_read_until(sock_, input_buffer_, '\n',boost::bind(&connection::handle_read_connection, this, _1));
       }
 
 
+      //Function to handle possible errors from the process of reading the socket.
       void handle_read_connection(const boost::system::error_code& ec){
         if (stopped_){
             return;
         }
 
         if (!ec){
-          // Extract the newline-delimited message from the buffer.
+          // If no error occurred, extract the newline-delimited message from the buffer.
           std::string line;
           std::istream is(&input_buffer_);
           std::getline(is, line);
 
+          //Ignore empty heartbeat messages.
           if (!line.empty()){
+            //Check to see if a valid command was used.
             if (is_command_valid(line)){
-              handle_serial_send(line);
+              serial_send(line);
             }
           }
         }
-
         start_read_connection();
       }
 
 
-      void handle_serial_send(std::string line){
-        std::string terminated_line;
-        std::cout << "Sending: " << line << "\n";
-        terminated_line = line + std::string("\n");
-        std::size_t n = terminated_line.size();
-        terminated_line.copy(send_buffer_, n);
-        boost::asio::async_write(SPort, boost::asio::buffer(send_buffer_,n),boost::bind(&connection::empty_handle_serial, this, _1));
-      }
-
-
-      void empty_handle_serial(const boost::system::error_code& ec){
-        if (ec)
-        {
-          std::cout << "Error on serial communication to Arduino\n";
+      //Function to handle possible errors from sending a message to the client
+      //through the socket. If a connection was successfull, the heartbeat
+      //timer is reset to avoid sending useless heartbeat messages.
+      void handle_send_connection(const boost::system::error_code& ec){
+        if (ec){
+          printf("Erro a enviar mensagem de erro para o client\n");
+        }
+        else{
+            KeepAlive_.expires_from_now(boost::posix_time::seconds(28));
         }
       }
 
-    //-----------------------------ERROR HANDLING--------------------------------
 
-    bool is_command_valid(std::string &new_line){
-      std::vector<std::string> cmds;
-      std::string msg_;
-      enum {max_length=1024};
-      char error_buffer_[max_length];
+      //Function that performs various tests to ensure a valid command was used.
+      bool is_command_valid(std::string &new_line){
 
-      if (new_line.compare("KILL")!=0){
-        if (new_line.compare("EXIT")!=0){
-            if(new_line.compare("r")!=0){
-              split(cmds, new_line, is_any_of(" ")); // here it is
-              if (cmds.size()==3){
-                  if (cmds[0].compare("s")== 0){
-                    try{
-                      int ocup = lexical_cast<int>(cmds[2]);
-                      lexical_cast<int>(cmds[1]);
-                      if (ocup!=0 && ocup!=1){
+        std::vector<std::string> cmds;
+        std::string msg_;
+        enum {max_length=1024};
+        char error_buffer_[max_length];
+
+        if (new_line.compare("KILL")!=0){
+          if (new_line.compare("EXIT")!=0){
+              if(new_line.compare("r")!=0){
+                split(cmds, new_line, is_any_of(" ")); // here it is
+                if (cmds.size()==3){
+                    if (cmds[0].compare("s")== 0){
+                      try{
+                        int ocup = lexical_cast<int>(cmds[2]);
+                        lexical_cast<int>(cmds[1]);
+                        if (ocup!=0 && ocup!=1){
+                          msg_="Invalid command:Occupancy command is used as 's <desk_i> <val>'\n";
+                          std::size_t n = msg_.size();
+                          msg_.copy(error_buffer_, n);
+                          //write(sock_, boost::asio::buffer(error_buffer_,n));
+                          boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&connection::handle_send_connection, this, _1));
+                          return false;
+                        }
+                      }
+                      catch(boost::bad_lexical_cast&){
                         msg_="Invalid command:Occupancy command is used as 's <desk_i> <val>'\n";
                         std::size_t n = msg_.size();
                         msg_.copy(error_buffer_, n);
                         //write(sock_, boost::asio::buffer(error_buffer_,n));
-                        boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),
-                              boost::bind(&connection::handle_connection_send, this, _1));
+                        boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&connection::handle_send_connection, this, _1));
                         return false;
                       }
-                    }
-                    catch(boost::bad_lexical_cast&){
-                      msg_="Invalid command:Occupancy command is used as 's <desk_i> <val>'\n";
-                      std::size_t n = msg_.size();
-                      msg_.copy(error_buffer_, n);
-                      //write(sock_, boost::asio::buffer(error_buffer_,n));
-                      boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),
-                            boost::bind(&connection::handle_connection_send, this, _1));
-                      return false;
-                    }
-                    new_line=cmds[0]+' '+cmds[2]+' '+cmds[1];
-                    return true;
-                  }
-
-                  else if (cmds[0].compare("c") == 0 || cmds[0].compare("d") == 0 ||
-                           cmds[0].compare("b") == 0){
-                    if (cmds[1].compare("l") == 0 || cmds[1].compare("d") == 0){
-                      try{
-                        lexical_cast<int>(cmds[2]);
-                      }
-                      catch(boost::bad_lexical_cast&){
-                        msg_="Invalid command:See list provided by the professor\n";
-                        std::size_t n = msg_.size();
-                        msg_.copy(error_buffer_, n);
-                        //write(sock_, boost::asio::buffer(error_buffer_,n));
-                        boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),
-                              boost::bind(&connection::handle_connection_send, this, _1));
-                        return false;
-                      }
+                      new_line=cmds[0]+' '+cmds[2]+' '+cmds[1];
                       return true;
                     }
-                    else{
-                      msg_="Invalid command:See list provided by the professor\n";
-                      std::size_t n = msg_.size();
-                      msg_.copy(error_buffer_, n);
-                      //write(sock_, boost::asio::buffer(error_buffer_,n));
-                      boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),
-                            boost::bind(&connection::handle_connection_send, this, _1));
-                      return false;
-                    }
-                  }
 
-                  else if (cmds[0].compare("g") == 0){
-                    if (cmds[1].compare("p") == 0 || cmds[1].compare("e") == 0 ||
-                        cmds[1].compare("c") == 0 || cmds[1].compare("v") == 0){
-                      try{
-                        lexical_cast<int>(cmds[2]);
-                      }
-                      catch(boost::bad_lexical_cast&){
-                        if(cmds[2].compare("T") == 0){
-                          return true;
+                    else if (cmds[0].compare("c") == 0 || cmds[0].compare("d") == 0 ||
+                             cmds[0].compare("b") == 0){
+                      if (cmds[1].compare("l") == 0 || cmds[1].compare("d") == 0){
+                        try{
+                          lexical_cast<int>(cmds[2]);
                         }
-                        else{
-                          msg_="Invalid command:See list provided by the professor 2\n";
+                        catch(boost::bad_lexical_cast&){
+                          msg_="Invalid command:See list provided by the professor\n";
                           std::size_t n = msg_.size();
                           msg_.copy(error_buffer_, n);
                           //write(sock_, boost::asio::buffer(error_buffer_,n));
-                          boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),
-                                boost::bind(&connection::handle_connection_send, this, _1));
+                          boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&connection::handle_send_connection, this, _1));
                           return false;
                         }
+                        return true;
                       }
-                      return true;
-                    }
-                    else if (cmds[1].compare("l") == 0 || cmds[1].compare("d") == 0 || cmds[1].compare("o") == 0 ||
-                             cmds[1].compare("L") == 0 || cmds[1].compare("O") == 0 || cmds[1].compare("r") == 0){
-                      try{
-                        lexical_cast<int>(cmds[2]);
-                      }
-                      catch(boost::bad_lexical_cast&){
+                      else{
                         msg_="Invalid command:See list provided by the professor\n";
                         std::size_t n = msg_.size();
                         msg_.copy(error_buffer_, n);
                         //write(sock_, boost::asio::buffer(error_buffer_,n));
-                        boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),
-                              boost::bind(&connection::handle_connection_send, this, _1));
+                        boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&connection::handle_send_connection, this, _1));
                         return false;
                       }
-                      return true;
+                    }
+
+                    else if (cmds[0].compare("g") == 0){
+                      if (cmds[1].compare("p") == 0 || cmds[1].compare("e") == 0 ||
+                          cmds[1].compare("c") == 0 || cmds[1].compare("v") == 0){
+                        try{
+                          lexical_cast<int>(cmds[2]);
+                        }
+                        catch(boost::bad_lexical_cast&){
+                          if(cmds[2].compare("T") == 0){
+                            return true;
+                          }
+                          else{
+                            msg_="Invalid command:See list provided by the professor 2\n";
+                            std::size_t n = msg_.size();
+                            msg_.copy(error_buffer_, n);
+                            //write(sock_, boost::asio::buffer(error_buffer_,n));
+                            boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&connection::handle_send_connection, this, _1));
+                            return false;
+                          }
+                        }
+                        return true;
+                      }
+                      else if (cmds[1].compare("l") == 0 || cmds[1].compare("d") == 0 || cmds[1].compare("o") == 0 ||
+                               cmds[1].compare("L") == 0 || cmds[1].compare("O") == 0 || cmds[1].compare("r") == 0){
+                        try{
+                          lexical_cast<int>(cmds[2]);
+                        }
+                        catch(boost::bad_lexical_cast&){
+                          msg_="Invalid command:See list provided by the professor\n";
+                          std::size_t n = msg_.size();
+                          msg_.copy(error_buffer_, n);
+                          //write(sock_, boost::asio::buffer(error_buffer_,n));
+                          boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&connection::handle_send_connection, this, _1));
+                          return false;
+                        }
+                        return true;
+                      }
+                      else{
+                        msg_="Invalid command:See list provided by the professor\n";
+                        std::size_t n = msg_.size();
+                        msg_.copy(error_buffer_, n);
+                        //write(sock_, boost::asio::buffer(error_buffer_,n));
+                        boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&connection::handle_send_connection, this, _1));
+                        return false;
+                      }
                     }
                     else{
                       msg_="Invalid command:See list provided by the professor\n";
                       std::size_t n = msg_.size();
                       msg_.copy(error_buffer_, n);
                       //write(sock_, boost::asio::buffer(error_buffer_,n));
-                      boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),
-                            boost::bind(&connection::handle_connection_send, this, _1));
+                      boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&connection::handle_send_connection, this, _1));
                       return false;
                     }
-                  }
-                  else{
-                    msg_="Invalid command:See list provided by the professor\n";
-                    std::size_t n = msg_.size();
-                    msg_.copy(error_buffer_, n);
-                    //write(sock_, boost::asio::buffer(error_buffer_,n));
-                    boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),
-                          boost::bind(&connection::handle_connection_send, this, _1));
-                    return false;
-                  }
+                }
+                else{
+                  msg_="Invalid command: Wrong # of arguments\n";
+                  std::size_t n = msg_.size();
+                  msg_.copy(error_buffer_, n);
+                  //write(sock_, boost::asio::buffer(error_buffer_,n));
+                  boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&connection::handle_send_connection, this, _1));
+                  return false;
+                }
               }
               else{
-                msg_="Invalid command: Wrong # of arguments\n";
+                msg_="Invalid command: Reset not implemented (For now, please use the reset button)\n";
                 std::size_t n = msg_.size();
                 msg_.copy(error_buffer_, n);
                 //write(sock_, boost::asio::buffer(error_buffer_,n));
-                boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),
-                      boost::bind(&connection::handle_connection_send, this, _1));
+                boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&connection::handle_send_connection, this, _1));
                 return false;
               }
-            }
-            else{
-              msg_="Invalid command: Reset not implemented (For now, please use the reset button)\n";
+          }
+          else{
+              msg_="\n Client disconnected\n";
               std::size_t n = msg_.size();
               msg_.copy(error_buffer_, n);
-              //write(sock_, boost::asio::buffer(error_buffer_,n));
-              boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),
-                    boost::bind(&connection::handle_connection_send, this, _1));
+              boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&connection::handle_send_connection, this, _1));
+              stop_connection();
               return false;
-            }
+          }
+          return false;
         }
         else{
-            msg_="\n Client disconnected\n";
-            std::size_t n = msg_.size();
-            msg_.copy(error_buffer_, n);
-            boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&connection::handle_connection_send, this, _1));
-            stop();
-            return false;
+          msg_="Server killed\n";
+          std::size_t n = msg_.size();
+          msg_.copy(error_buffer_, n);
+          boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&connection::handle_send_connection, this, _1));
+          kill_server();
+          return false;
         }
-        return false;
-      }
-      else{
-        msg_="Server killed\n";
-        std::size_t n = msg_.size();
-        msg_.copy(error_buffer_, n);
-        boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&connection::handle_connection_send, this, _1));
-        kill_server();
-        return false;
-      }
-    }
-
-
-    void handle_connection_send(const boost::system::error_code& ec){
-      if (ec){
-        printf("Erro a enviar mensagem de erro para o client\n");
-      }
-      else{
-          KeepAlive_.expires_from_now(boost::posix_time::seconds(28));
-      }
     }
 };
 
+
+
+//Class to enclose the various processes used in initializing a server.
 class server
 {
     public:
@@ -402,7 +424,7 @@ class server
 
       void handle_accept(connection* new_connection, const boost::system::error_code& ec){
         if (!ec){
-          new_connection->start();
+          new_connection->start_connection();
           stopped_ = false;
           std::cout << "New client connected\n";
         }
@@ -417,10 +439,8 @@ class server
 int main(int argc, char* argv[])
 {
   int PORT=10000;
-  try
-  {
-    if (argc != 2)
-    {
+  try{
+    if (argc != 2){
       std::cerr << "Default port used (PORT:10000)\n";
     }
     else{
@@ -433,10 +453,8 @@ int main(int argc, char* argv[])
     server s(io, PORT);
     io.run();
   }
-  catch (std::exception& e)
-  {
+  catch (std::exception& e){
     std::cerr << "Exception: " << e.what() << "\n";
   }
-
   return 0;
 }
