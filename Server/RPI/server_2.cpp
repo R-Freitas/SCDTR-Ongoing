@@ -14,7 +14,7 @@
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/lexical_cast.hpp>
-#include <pigpio.h>
+//#include <pigpio.h>
 
 using boost::asio::deadline_timer;
 using boost::asio::ip::tcp;
@@ -24,7 +24,7 @@ using namespace boost::asio;
 
 bool stopped_;
 
-
+/*
 //I2C Variables
 #define SCL 19
 #define SDA 18
@@ -69,7 +69,7 @@ void initialize_i2c(){
   printf("HEY2\n");
 }
 
-
+*/
 class connection
 {
 public:
@@ -96,7 +96,7 @@ public:
     boost::system::error_code ignored_ec;
     sock_.close(ignored_ec);
     KeepAlive_.cancel();
-    io.stop();
+    //io.stop();
     //heartbeat_timer_.cancel();
   }
 
@@ -334,7 +334,7 @@ bool is_command_valid(std::string &new_line){
   return false;
 }
 void empty_handle_error(const boost::system::error_code& ec){
-  if (!ec){
+  if (ec){
     printf("Erro a enviar mensagem de erro para o client\n");
   }
 }
@@ -387,8 +387,8 @@ int main(int argc, char* argv[])
     }
 
     boost::asio::io_service io;
-    initialize_i2c();
-    thread t (i2c_read);
+    //initialize_i2c();
+    //thread t (i2c_read);
     server s(io, PORT);
     io.run();
   }
