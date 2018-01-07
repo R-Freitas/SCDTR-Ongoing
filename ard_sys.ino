@@ -28,7 +28,7 @@ float D = 0;
 float D_1 = 0;
 float P = 0;
 float C = 0;
-int ff_value = 0;
+float ff_value = 0;
 
 //CONTROLER CONSTANTS
 double Kp = 0.7;
@@ -37,6 +37,16 @@ double Kc = 1;
 double Kd = 0;
 int a = 10;
 int u =0;
+
+//LOCAL CONTROLER
+int ref_LOW  = 90;
+int ref_HIGH = 170;
+double feed_gain= 1.03;
+
+float Lref;
+float pwm;
+float current_lux;
+bool distributed_control = false;
 
 //I2C VARIABLES
 int address=0;
@@ -52,20 +62,33 @@ int recolhe_valores=0, calibre_count=0;
 int PWM_Calibre=255;
 arduino_info elements[N_ELEMENTS];
 
+// -------------------------- New variables --------------------------------- //
+
+float energy = 0;
+float error = 0;
+float errorBuffer = 0;
+float errorCurrent = 0;
+float variance = 0;
+float varianceBuffer = 0;
+float Li, Li_1, Li_2;
+int metricsSampleCounter = 0;
+float K[2];
+
+
 //Others
 bool acende = 0;
 unsigned long t_0,diff,t0; //time variables
 float_as_bytes buf[N_ELEMENTS*N_ELEMENTS];
 
 //STATE VARIABLES
-int occupancy = 0; //0 for false and 1 for true
+int occupancy[2] = {0,0}; //0 for false and 1 for true
 
 
 //Consensus global variables
 int d_broadcast_count= 0;
 
 // System definition
-float Lmin[N_ELEMENTS] = {150,80};
+float Lmin[N_ELEMENTS] = {120,70};
 float o[N_ELEMENTS] = {30,0};
 
 // Cost function definition
@@ -74,7 +97,7 @@ float Q[N_ELEMENTS] = {1,1};
 
 
 // ADMM auxiliary variables
-float rho = 0.01;                       // ADMM penalty parameter
+float rho = 1.2;                       // ADMM penalty parameter
 float y[N_ELEMENTS];                    // Lagrange multipliers vector
 float d[N_ELEMENTS];                    // Final (optimal) duty cycles, for local arduino
 float d_av[N_ELEMENTS];                 // Duty cycles average, for all arduinos
@@ -193,7 +216,7 @@ void calibracao (arduino_info* elements, int found_elements){
   
   }
   for (int i=0;i<found_elements;i++){
-    elements[i].ganho=(transform_ADC_in_lux(elements[i].ganho)/PWM_Calibre)*100;
+    elements[i].ganho= transform_ADC_in_lux(elements[i].ganho)/100;
   }
 }
 
@@ -239,14 +262,49 @@ void analyse_request(String data){
     case 's':
     int new_occupancy;
     new_occupancy = data[1] - '0';
-    occupancy = new_occupancy;
-    while(control !=0){
+    if(occupancy[my_index] != new_occupancy){
+     occupancy[my_index] = new_occupancy;
+     for(int i=0; i< found_elements; i++){
+      if(i != my_index){
+        char send_index;
+        char send_occupancy;
+        send_occupancy = new_occupancy + '0';
+        send_index = my_index + '0';
+        while(control !=0){
+          Wire.beginTransmission(elements[i].endereco);
+          Wire.write("O");
+          Wire.write(send_index);
+          Wire.write(send_occupancy);
+        control= Wire.endTransmission(true);
+      }
+      control = 1; 
+    }
+    }
         Wire.beginTransmission(pi_address);
         Wire.write("ack");
         Wire.write('\0');
-        control= Wire.endTransmission(true);
+    break;
+
+    case 'O':
+    int receive_index;
+    int state_occupancy;
+    receive_index = data[1] - '0';
+    state_occupancy = data[2] - '0';
+    occupancy[receive_index] = state_occupancy;
+    
+    break;
+
+    //MATRIZ INVERSA
+    case 'K':
+      for(int i=0; i<2; i++){
+        for(int j=0; j<4;j++){
+          buf[i].b[j] = data[i*4+j+1];
+        }
+        K[i]= buf[i].fval;
+        Serial.println(K[i]);
       }
     break;
+
     
     //ANSWER RASPBERRY PI
     char send_desk;
@@ -340,20 +398,21 @@ void analyse_request(String data){
       break;
 
     case 'D':
-      int index = (data[1] - '0') -1; //origin desk number - 1
+      int index = data[1] - '0'; //origin desk number - 1
 
        //RECEIVE DATA IN CHAR AND CHANGE IT TO FLOAT
        for(int num_col = 0; num_col < found_elements; num_col ++){ 
        for(int j=0; j<4; j++){ //4 bytes for each value
-        buf[index*found_elements+num_col].b[j] = data[num_col*4+j+2];
+        buf[num_col].b[j] = data[num_col*4+j+2];
       } 
        }
        for(int i = 0; i<found_elements; i++){
-        d_copies[index][i] = buf[index*found_elements + i].fval;
+        d_copies[index][i] = buf[i].fval;
        }
        d_broadcast_count++;
     break;
   }
+}
 }
 
 void streaming(){
@@ -789,6 +848,81 @@ void update_d_copies(){
     }
 }
 
+
+void feedforward_inverse(float* K){
+    float k11, k12, k21, k22;
+    if(my_index==0){
+        k11 = elements[1].ganho;
+        k12 = elements[2].ganho;
+        k21 = K[1];
+        k22 = K[2];
+    }
+    else if(my_index==1){
+        k11 = K[1];
+        k12 = K[2];
+        k21 = elements[1].ganho;
+        k22 = elements[2].ganho;
+    }
+    float det = k11*k22 - k12*k21;
+    d[0] = (Lmin[0]-o[0])*(k22-k12)/det;
+    d[1] = (Lmin[1]-o[1])*(k11-k21)/det;
+    for(int i=0; i<found_elements; i++){
+      if(d[i]<0){
+        d[i]=0;
+        }
+      else if(d[i]>100){
+        d[i]=100;
+        }
+      }
+}
+
+float compute_Lref(){
+    Lref = 0;
+    for(int i=0; i<found_elements; i++){
+        Lref += (elements[i].ganho)*d[i] + o[i];
+    }
+    return Lref;
+}
+
+void compute_stats(){
+    metricsSampleCounter++;
+    double Lmeasured = transform_ADC_in_lux(analogRead(LDRPin));
+
+    // Accumulated comfort error (since last system restart)
+    double errorCurrent = Lref - Lmeasured;
+    if(error > 0){
+        errorBuffer += errorCurrent;
+    }
+    error = errorBuffer/metricsSampleCounter;
+
+    // Accumulated comfort variance (since last system restart)
+    if(metricsSampleCounter==1){
+        Li_2 = Lmeasured;
+    }
+    else if (metricsSampleCounter==2){
+        Li_1 = Lmeasured;
+    }
+    else if(metricsSampleCounter>=3){
+        Li_2 = Li_1;
+        Li_1 = Li;
+        Li = Lmeasured;
+        varianceBuffer += abs(Li - 2*Li_1 + Li_2);
+    }
+    variance = varianceBuffer/(metricsSampleCounter*T_s*T_s);
+    // Accumulated energy consumption (since last system restart)
+    energy += d[my_index]*T_s;
+}
+
+void check_occupancy(){
+  for(int i=0; i<found_elements; i++)
+    if(occupancy[i] == 0){
+      Lmin[i] = ref_LOW;
+    }
+    else if(occupancy[i] == 1){
+      Lmin[i] = ref_HIGH;     
+    }
+ }
+
 float PI_controler(float Lref, float measured_lux, float ff_value){
 
   float outputValue_0;
@@ -886,7 +1020,24 @@ void setup() {
   
   sort_copy(&elements[0],found_elements);   //Sort found addresses for use in calibration
   calibracao(&elements[0],found_elements);  //Calibration
-  
+
+  //MATRIZ INVERSA-Broadcast gains
+
+  for(int i = 0; i< found_elements; i++){
+    if(elements[i].endereco != address){
+      int send_to = elements[i].endereco;
+      while(control !=0){
+        Wire.beginTransmission(send_to);
+        Wire.write("K");
+        Wire.write((byte*) &elements[0].ganho, 4);
+        Wire.write((byte*) &elements[1].ganho, 4);
+        control= Wire.endTransmission(true);
+      }
+      control = 1;
+    }
+  }
+
+
      // CONSENSUS: System / cost function variables initialization
      for(int i=0; i<found_elements; i++){
          //Lmin[i] = 160;
@@ -903,7 +1054,11 @@ void setup() {
             d_copies[i][j] = 0;
         }
     }
-    
+
+  analogWrite(LedPin,0);
+  delay(1000);
+  o[my_index] = transform_ADC_in_lux(sampleADC());
+  //Serial.println(o[my_index]);  
   Serial.println("Setup ended");
   //analogWrite(LedPin,PWM_Calibre);
   t0 = millis();
@@ -912,10 +1067,59 @@ void setup() {
 
 void loop() {
 
+check_occupancy();
+ 
   if(Serial.available()> 0){
     analyse_serial();
   }
 
+if(distributed_control == false){
+  if (occupancy[my_index] == 1){
+    ff_value = ref_HIGH* feed_gain;
+    Lref = ref_HIGH;  
+  }
+  else if(occupancy[my_index] == 0){
+  ff_value = ref_LOW * feed_gain;
+  Lref= ref_LOW;
+}
+
+
+current_lux = transform_ADC_in_lux(sampleADC());
+
+pwm =  PI_controler(Lref, current_lux, ff_value);
+
+analogWrite(LedPin, pwm);
+}
+else{
+
+feedforward_inverse(K);
+
+Lref = compute_Lref();
+
+ff_value = d[my_index];
+
+current_lux = transform_ADC_in_lux(sampleADC());
+
+pwm =  PI_controler(Lref, current_lux, ff_value);
+
+analogWrite(LedPin, 2.55*pwm);
+  
+}
+
+//Serial.println(pwm);
+
+//Matriz Inversa- por else, nao esquecer
+
+/*
+
+
+current_lux = transform_ADC_in_lux(sampleADC());
+
+pwm = PI_controler(Lref, current_lux, float ff_value)
+
+
+
+*/
   if(acende==true){
   digitalWrite(LED_BUILTIN,HIGH);
   delay(500);
@@ -924,8 +1128,18 @@ void loop() {
   }
 
   //CONSENSUS CALCULATIONS
+
+/*
+  Serial.print("My index is: ");
+  Serial.println(my_index);
+  Serial.println(elements[0].ganho);
+  Serial.println(elements[1].ganho); */
+
   
-  /*int iterations = 20;
+
+
+  /*
+  int iterations = 50;
   
     for(int i=0; i<iterations; i++){
     
@@ -947,8 +1161,7 @@ void loop() {
         //
            if (elements[d_broadcast_count].endereco == address){
                char send_mydesk;
-               int aux = my_index + 1;
-               send_mydesk = aux + '0';
+               send_mydesk = my_index + '0';
                while(control !=0){
                  Wire.beginTransmission(0);
                  Wire.write('D');
@@ -975,9 +1188,12 @@ void loop() {
       while(1);*/
  
   
+
+  if(stream !=0){
+    streaming();
+  }
+
   
-
-
   Serial.print(" \n");
   for (int j=0;j<found_elements;j++){
     Serial.print("Endereco: ");
@@ -990,11 +1206,7 @@ void loop() {
     Serial.println(transform_ADC_in_lux(analogRead(LDRPin)));
   }
   
-  delay(500);
-
-  if(stream !=0){
-    streaming();
-  }
+  delay(T_s);
   
 }
 
