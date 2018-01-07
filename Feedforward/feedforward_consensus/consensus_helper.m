@@ -1,4 +1,4 @@
-close all, clear all; clc;
+close all, clear all; clc; format shortg;
 
 % SYSTEM / COST FUNCTION 
 k11 = 2; k12 = 1; k21 = 1; k22 = 2;
@@ -13,7 +13,7 @@ c = [c1 c2]; Q = [q1 0; 0 q2];
 %                 SOLVE WITH CONSENSUS
 % ----------------------------------------------------- %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-rho = 1.2;     
+rho = 0.6;     
 % ----------------------------------------------------- %
 %node 1 initialization
 d1 = [0;0];             % d[N_ELEMENTS]
@@ -31,7 +31,8 @@ k2 = [k21;k22];
 % ----------------------------------------------------- %
 
 %iterations
-for i=1:3,
+iterations = 20;
+for i=1:iterations,
   % node 1
    d11_best = -1; % d_best
    d12_best = -1; % d_best
@@ -413,55 +414,60 @@ for i=1:3,
    
    d_copies = [d1_copy'; d2_copy']
    
-   % %save data for plots
-   % av1(i) = d1_av(1);
-   % av2(i) = d1_av(2); 
+   %save data for plots
+   av1(i) = d1_av(1);
+   av2(i) = d1_av(2); 
 end;
 
 %% Print buffers
 
-buffer1_u
-buffer1_l
-buffer1_b0
-buffer1_b100
-buffer1_l0
-buffer1_l100
+% disp('-----------------------------------------------------------');
+% 
+% buffer1_u
+% buffer1_l
+% buffer1_b0
+% buffer1_b100
+% buffer1_l0
+% buffer1_l100
+% 
+% buffer_d1
+% buffer_d1_av
+% buffer_y1
+% 
+% disp('-----------------------------------------------------------');
+% 
+% buffer2_u
+% buffer2_l
+% buffer2_b0
+% buffer2_b100
+% buffer2_l0
+% buffer2_l100
+% 
+% buffer_d2
+% buffer_d2_av
+% buffer_y2
 
-buffer_d1
-buffer_d1_av
-buffer_y1
 
-disp('-----------------------------------------------------------');
-
-buffer2_u
-buffer2_l
-buffer2_b0
-buffer2_b100
-buffer2_l0
-buffer2_l100
-
-buffer_d2
-buffer_d2_av
-buffer_y2
-
-
-% % SOLVE WITH MATLAB QUADPROG
-% A = -K; b = [o1-L1; o2-L2];
-% lb = [0;0]; ub = [100;100];
+% SOLVE WITH MATLAB QUADPROG
+A = -K; b = [o1-L1; o2-L2];
+lb = [0;0]; ub = [100;100];
 % disp('Matlab solutions')
-% d = quadprog(Q,c,A,b,[],[],lb,ub)
-% l = K*d+o
+d = quadprog(Q,c,A,b,[],[],lb,ub);
+l = K*d+o;
 
 % disp('Consensus Solutions')
 % d_ = d2_av
 % l_ = K*d_+o
 
 % % PLOTS
-% figure(10);
-% plot(1:50, av1, 1:50, av2);
-% legend('d_1','d_2');
-% title('primal vars');
-% xlabel('iter');
+figure(10);
+plot(1:iterations, av1, 1:iterations, av2);
+grid minor;
+legend('d_1','d_2');
+title(sprintf('Evolution of primal variables (rho = %f)', rho));
+xlabel('Iteration');
+ylabel('Duty cycle [%]')
+set(gcf, 'Position', get(0, 'Screensize'));
 % figure(15);
 % t = 0:100;
 % constr1 = (L1-o1)/k12-(k11/k12)*t;
