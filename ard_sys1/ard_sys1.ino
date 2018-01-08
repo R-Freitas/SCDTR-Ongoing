@@ -124,16 +124,13 @@ void analyse_serial(){
     else{
       if(elements[received_ad-1].endereco){ //checks if the desk_number exists
         int send_to = elements[received_ad-1].endereco;
-        while(control !=0){
           Wire.beginTransmission(send_to);
           Wire.write(data.c_str());
-          control= Wire.endTransmission(true);
+          Wire.endTransmission();
         }
-      control = 1;
       }
   }
  }
-}
 
 void sort_copy (arduino_info* arr, int size){
   for (int k=0; k<(size-1);k++){
@@ -261,26 +258,20 @@ void analyse_request(String data){
     if(occupancy[my_index] != new_occupancy){
      occupancy[my_index] = new_occupancy;
      changed_occupancy= 1;
-     for(int i=0; i< found_elements; i++){
-      if(i != my_index){
         char send_index;
         char send_occupancy;
         send_occupancy = new_occupancy + '0';
         send_index = my_index + '0';
-        while(control !=0){
-          Wire.beginTransmission(elements[i].endereco);
+          Wire.beginTransmission(0);
           Wire.write("O");
           Wire.write(send_index);
           Wire.write(send_occupancy);
-        control= Wire.endTransmission(true);
-      }
-      control = 1;
+          Wire.endTransmission();
     }
-    }
-    }
-        Wire.beginTransmission(pi_address);
-        Wire.write("ack");
-        Wire.write('\0');
+        //Wire.beginTransmission(pi_address);
+        //Wire.write("ack");
+        //Wire.write('\0');
+        //Wire.endTransmission();
     break;
 
     case 'O':
@@ -289,14 +280,9 @@ void analyse_request(String data){
     receive_index = data[1] - '0';
     state_occupancy = data[2] - '0';
     occupancy[receive_index] = state_occupancy;
+    changed_occupancy = 1;
 
     break;
-
-    //Save offset values from other desks
-    case 'F':
-
-    break;
-
 
     //ANSWER RASPBERRY PI
     char send_desk;
@@ -854,7 +840,7 @@ void broadcast_d(){
     while(d_broadcast_count<found_elements){
         t_0=micros();
         diff=0;
-        while(diff<10){
+        while(diff<100){
             diff=micros()-t_0;
         }
         if (elements[d_broadcast_count].endereco == address){
