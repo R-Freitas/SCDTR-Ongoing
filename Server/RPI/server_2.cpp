@@ -14,7 +14,7 @@
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/lexical_cast.hpp>
-//#include <pigpio.h>
+#include <pigpio.h>
 
 using boost::asio::deadline_timer;
 using boost::asio::ip::tcp;
@@ -26,11 +26,6 @@ bool stopped_;
 
 
 
-
-
-
-/*
-//I2C Variables
 #define SCL 19
 #define SDA 18
 #define ADDRESS 0x09
@@ -41,7 +36,6 @@ bsc_xfer_t xfer;
 
 //--------------------Miscelaneous functions------------------------------------
 //Functions for i2c services
-
 void i2c_handle_read (int event, uint32_t tick){
   int status;
   printf("HEY\n");
@@ -52,6 +46,8 @@ void i2c_handle_read (int event, uint32_t tick){
     std::cout<< "Recebido " << xfer.rxCnt << " bytes" << std::endl;
   }
 }
+
+
 void i2c_read(){
     for(;;)
       {
@@ -62,7 +58,9 @@ void i2c_read(){
           return;
         }
       }
-    }
+}
+
+
 void initialize_i2c(){
   xfer.control = (0x09<<16) | 0x305;
 
@@ -75,7 +73,9 @@ void initialize_i2c(){
   printf("HEY2\n");
 }
 
-*/
+
+
+
 //Class to manage the connection between client and server.
 //Handles the various assinchronous processes between client and
 //Arduino communication.
@@ -448,8 +448,8 @@ int main(int argc, char* argv[])
     }
 
     boost::asio::io_service io;
-    //initialize_i2c();
-    //thread t (i2c_read);
+    initialize_i2c();
+    thread t (i2c_read);
     server s(io, PORT);
     io.run();
   }
