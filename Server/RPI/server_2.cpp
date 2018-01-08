@@ -70,10 +70,57 @@ void initialize_i2c(){
   printf("HEY2\n");
 }
 
+//"/dev/ttyACM0"
 
 */
 
+class serial_connection{
+  private:
+    enum {max_length=1024};
+    char send_buffer_[max_length];
+    serial_port SPort;
 
+  public:
+    serial_connection(boost::asio::io_service& io)
+    : SPort(io)
+    {
+    }
+
+    void start_serial_connection(std::string port, unsigned int baud_rate){
+      boost::system::error_code error;
+      SPort.open(port, error); //connect to port containing arduino
+      if( error ){
+          cout << "Error when connecting to Arduino \n";
+          return ;
+      }
+      SPort.set_option(serial_port_base::baud_rate(baud_rate),error);
+      if( error ) {
+          cout << "Error when initializing connection to Arduino \n";
+          return ;
+      }
+    }
+
+    //Function to schedule the process of serial communication with the Arduino.
+    void serial_send(std::string line){
+      std::string terminated_line;
+      std::cout << "Sending: " << line << "\n";
+      terminated_line = line + std::string("\n");
+      std::size_t n = terminated_line.size();
+      terminated_line.copy(send_buffer_, n);
+      boost::asio::async_write(SPort, boost::asio::buffer(send_buffer_,n),boost::bind(&serial_connection::handle_serial_send, this, _1));
+    }
+
+
+    //Deals with possible errors from the serial communication.
+    void handle_serial_send(const boost::system::error_code& ec){
+      if (ec)
+      {
+        std::cout << "Error on serial communication to Arduino\n";
+      }
+    }
+
+
+};
 
 //Class to manage the connection between client and server.
 //Handles the various assinchronous processes between client and
@@ -91,17 +138,15 @@ class socket_connection
       tcp::socket& socket(){
         return sock_;
       }
-
       //Functions to manage the server. Start it, end a connection with a client
       //and kill the server. These functions are called acording to user commands
       //from the client.
-
-
       //Iniciates the various processes
       void start_socket_connection(){
         stopped_ = false;
-        start_KeepAlive();
-        start_serial();
+        KeepAlive_.expires_from_now(boost::posix_time::seconds(28));
+        KeepAlive_.async_wait(boost::bind(&socket_connection::start_KeepAlive, this));
+        SPort.start_serial_connection("/dev/ttyACM0",9600);
         start_read_socket_connection();
       }
 
@@ -126,50 +171,6 @@ class socket_connection
 
 
     private:
-      tcp::socket sock_;
-      boost::asio::deadline_timer KeepAlive_;
-      boost::asio::streambuf input_buffer_;
-      enum {max_length=1024};
-      char send_buffer_[max_length];
-      serial_port SPort;
-      std::string msg_;
-
-
-      //Function to initialize serial comunication
-      void start_serial(){
-        boost::system::error_code error;
-        SPort.open("/dev/ttyACM0", error); //connect to port containing arduino
-        if( error ){
-            cout << "Error when connecting to Arduino \n";
-            return ;
-        }
-        SPort.set_option(serial_port_base::baud_rate(9600),error);
-        if( error ) {
-            cout << "Error when initializing connection to Arduino \n";
-            return ;
-        }
-      }
-
-
-      //Function to schedule the process of serial communication with the Arduino.
-      void serial_send(std::string line){
-        std::string terminated_line;
-        std::cout << "Sending: " << line << "\n";
-        terminated_line = line + std::string("\n");
-        std::size_t n = terminated_line.size();
-        terminated_line.copy(send_buffer_, n);
-        boost::asio::async_write(SPort, boost::asio::buffer(send_buffer_,n),boost::bind(&socket_connection::handle_serial_send, this, _1));
-      }
-
-
-      //Deals with possible errors from the serial communication.
-      void handle_serial_send(const boost::system::error_code& ec){
-        if (ec)
-        {
-          std::cout << "Error on serial communication to Arduino\n";
-        }
-      }
-
 
       //Function to start the timer to send an heartbeat signal to the client.
       void start_KeepAlive(){
@@ -220,7 +221,7 @@ class socket_connection
           if (!line.empty()){
             //Check to see if a valid command was used.
             if (is_command_valid(line)){
-              serial_send(line);
+              SPort.serial_send(line);
             }
           }
         }
@@ -396,13 +397,18 @@ class socket_connection
           return false;
         }
     }
+
+    tcp::socket sock_;
+    boost::asio::deadline_timer KeepAlive_;
+    boost::asio::streambuf input_buffer_;
+    serial_connection SPort;
+    std::string msg_;
 };
 
 
 
 //Class to enclose the various processes used in initializing a server.
-class server
-{
+class server{
     public:
       server(boost::asio::io_service& io_service, short port)
         : io_service_(io_service),
@@ -411,8 +417,6 @@ class server
         start_accept();
       }
     private:
-      boost::asio::io_service& io_service_;
-      tcp::acceptor acceptor_;
 
       void start_accept(){
         socket_connection* new_socket_connection = new socket_connection(io_service_);
@@ -432,6 +436,10 @@ class server
         }
         start_accept();
       }
+
+      boost::asio::io_service& io_service_;
+      tcp::acceptor acceptor_;
+
 };
 
 
