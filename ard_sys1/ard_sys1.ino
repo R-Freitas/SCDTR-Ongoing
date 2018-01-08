@@ -6,17 +6,17 @@ const int LedPin = 9;
 const int LDRPin = A0;
 
 union float_as_bytes {
-  byte b[4];
-  float fval;};
+    byte b[4];
+    float fval;};
 
 struct arduino_info {
-  int endereco;
-  double ganho;
+    int endereco;
+    double ganho;
 };
 
 //Sample time
 double T_s  = 0.03;
-
+double T_us = T_s *1000*1000;
 
 //CONTROLER VARIABLES
 float error_0 = 0;     // (k)-th error value [lux]
@@ -77,7 +77,7 @@ int metricsSampleCounter = 0;
 
 //Others
 bool acende = 0;
-unsigned long t_0,diff,t0; //time variables
+unsigned long t_0,diff,t0, dt; //time variables
 float_as_bytes buf[N_ELEMENTS*N_ELEMENTS];
 
 //STATE VARIABLES
@@ -107,274 +107,272 @@ float d_copies[N_ELEMENTS][N_ELEMENTS]; // Duty cycles buffer, for all arduinos
 
 void analyse_serial(){
 
-  String data = "";
-  while(Serial.available()){
-    data += (char) Serial.read();
-  }
-
-  Serial.println(data);
-  Serial.print(sizeof(data));
-  //data = Serial.readString();
-
-  if(sizeof(data)>1){
-    int received_ad = data[2] - '0';
-    if(received_ad == desk_number){
-      analyse_request(data);
+    String data = "";
+    while(Serial.available()){
+        data += (char) Serial.read();
     }
-    else{
-      if(elements[received_ad-1].endereco){ //checks if the desk_number exists
-        int send_to = elements[received_ad-1].endereco;
-          Wire.beginTransmission(send_to);
-          Wire.write(data.c_str());
-          Wire.endTransmission();
+
+    if(sizeof(data)>1){
+        int received_ad = data[2] - '0';
+        if(received_ad == desk_number){
+            analyse_request(data);
         }
-      }
-  }
- }
+        else{
+            if(elements[received_ad-1].endereco){ //checks if the desk_number exists
+                int send_to = elements[received_ad-1].endereco;
+                Wire.beginTransmission(send_to);
+                Wire.write(data.c_str());
+                Wire.endTransmission();
+            }
+        }
+    }
+}
 
 void sort_copy (arduino_info* arr, int size){
-  for (int k=0; k<(size-1);k++){
-    for (int w=0; w<(size-(k+1));w++){
-      if (arr[w].endereco > arr[w+1].endereco){
-        arduino_info temp;
-        temp.endereco= arr[w].endereco;
-        arr[w].endereco=arr[w+1].endereco;
-        arr[w+1].endereco=temp.endereco;
-      }
+    for (int k=0; k<(size-1);k++){
+        for (int w=0; w<(size-(k+1));w++){
+            if (arr[w].endereco > arr[w+1].endereco){
+                arduino_info temp;
+                temp.endereco= arr[w].endereco;
+                arr[w].endereco=arr[w+1].endereco;
+                arr[w+1].endereco=temp.endereco;
+            }
+        }
     }
-  }
 
 }
 
 double sampleADC(){
-  double Value = 0;
-  for (int k=0;k<10;k++)
-  {
-    Value += analogRead(LDRPin);
-  }
-  Value /= 10;
-  return Value;
+    double Value = 0;
+    for (int k=0;k<10;k++)
+    {
+        Value += analogRead(LDRPin);
+    }
+    Value /= 10;
+    return Value;
 }
 
 void calibracao (arduino_info* elements, int found_elements){
 
 
-  while (calibre_count<found_elements){
-    if (elements[calibre_count].endereco == address){
-      desk_number = calibre_count +1;
-      my_index = calibre_count;
-      analogWrite(LedPin,PWM_Calibre);  //liga led
+    while (calibre_count<found_elements){
+        if (elements[calibre_count].endereco == address){
+            desk_number = calibre_count +1;
+            my_index = calibre_count;
+            analogWrite(LedPin,PWM_Calibre);  //liga led
 
-      t_0=micros();//Waits to ensure everything is read (se calhar considerar resposta para garantir comunicação)
-      diff=0;
-      while(diff<1000000){
-        diff=micros()-t_0;
-      }
+            t_0=micros();//Waits to ensure everything is read (se calhar considerar resposta para garantir comunicação)
+            diff=0;
+            while(diff<1000000){
+                diff=micros()-t_0;
+            }
 
-      while (control != 0){ //Transmite mensagem para os outros colocarem a escuta
-        Wire.beginTransmission(0);
-        Wire.write("CS");
-        control = Wire.endTransmission(true);
-      }
-      control=1;
+            while (control != 0){ //Transmite mensagem para os outros colocarem a escuta
+                Wire.beginTransmission(0);
+                Wire.write("CS");
+                control = Wire.endTransmission(true);
+            }
+            control=1;
 
-      elements[calibre_count].ganho = sampleADC();  //Lê valores
+            elements[calibre_count].ganho = sampleADC();  //Lê valores
 
-      t_0=micros();//Waits to ensure everything is read (se calhar considerar resposta para garantir comunicação)
-      diff=0;
-      while(diff<1000000){
-        diff=micros()-t_0;
-      }
+            t_0=micros();//Waits to ensure everything is read (se calhar considerar resposta para garantir comunicação)
+            diff=0;
+            while(diff<1000000){
+                diff=micros()-t_0;
+            }
 
-      analogWrite(LedPin,0);//Desliga Led
+            analogWrite(LedPin,0);//Desliga Led
 
-      while (control != 0){ //Transmite mensagem de flag para sairem de escuta
-        Wire.beginTransmission(0);
-        Wire.write("CE");
-        control = Wire.endTransmission(true);
-      }
-      control=1;
+            while (control != 0){ //Transmite mensagem de flag para sairem de escuta
+                Wire.beginTransmission(0);
+                Wire.write("CE");
+                control = Wire.endTransmission(true);
+            }
+            control=1;
 
-      calibre_count++; //incrementa
+            calibre_count++; //incrementa
+
+        }
+        else{
+            if (recolhe_valores == 1){
+                digitalWrite(LED_BUILTIN,HIGH);
+                elements[calibre_count].ganho = sampleADC();
+                //talvez apenas evocar uma vez, discutir com o duarte ou seja apos o adc meter recolhe_valores=0
+            }
+            digitalWrite(LED_BUILTIN,LOW);
+        }
 
     }
-    else{
-      if (recolhe_valores == 1){
-        digitalWrite(LED_BUILTIN,HIGH);
-        elements[calibre_count].ganho = sampleADC();
-        //talvez apenas evocar uma vez, discutir com o duarte ou seja apos o adc meter recolhe_valores=0
-      }
-      digitalWrite(LED_BUILTIN,LOW);
+    for (int i=0;i<found_elements;i++){
+        elements[i].ganho= transform_ADC_in_lux(elements[i].ganho)/100;
     }
-
-  }
-  for (int i=0;i<found_elements;i++){
-    elements[i].ganho= transform_ADC_in_lux(elements[i].ganho)/100;
-  }
 }
 
 void propagate_address(int address){
-  while (control != 0){
-    Wire.beginTransmission(0);
-    Wire.write('E');
-    Wire.write(address);
-    control = Wire.endTransmission(true);
+    while (control != 0){
+        Wire.beginTransmission(0);
+        Wire.write('E');
+        Wire.write(address);
+        control = Wire.endTransmission(true);
 
-  }
-  control=1;
+    }
+    control=1;
 
 
 }
 
 double transform_ADC_in_lux(double sensorValue){
-  double V_sensorValue=0, R_LDR=0, lux=0;
-  double m = -1.2618595, b = 2.54480706;
+    double V_sensorValue=0, R_LDR=0, lux=0;
+    double m = -1.2618595, b = 2.54480706;
 
-  V_sensorValue = (5*sensorValue/1023);
-  R_LDR = (10/V_sensorValue)*(5-V_sensorValue);
-  lux = pow(10,b)*pow(R_LDR,m);
-  return lux;
+    V_sensorValue = (5*sensorValue/1023);
+    R_LDR = (10/V_sensorValue)*(5-V_sensorValue);
+    lux = pow(10,b)*pow(R_LDR,m);
+    return lux;
 
 }
 
 void receiveEvent(int numBytes){
-  String request="";
+    String request="";
 
-  while(Wire.available()){
-    request += (char) Wire.read();
-  }
+    while(Wire.available()){
+        request += (char) Wire.read();
+    }
 
-  analyse_request(request);
+    analyse_request(request);
 }
 
 void analyse_request(String data){
 
-  switch(data[0]){
+    switch(data[0]){
 
-    //CHANGE STATE
-    case 's':
-    int new_occupancy;
-    new_occupancy = data[1] - '0';
-    if(occupancy[my_index] != new_occupancy){
-     occupancy[my_index] = new_occupancy;
-     changed_occupancy= 1;
-        char send_index;
-        char send_occupancy;
-        send_occupancy = new_occupancy + '0';
-        send_index = my_index + '0';
-          Wire.beginTransmission(0);
-          Wire.write("O");
-          Wire.write(send_index);
-          Wire.write(send_occupancy);
-          Wire.endTransmission();
-    }
+        //CHANGE STATE
+        case 's':
+        int new_occupancy;
+        new_occupancy = data[1] - '0';
+        if(occupancy[my_index] != new_occupancy){
+            occupancy[my_index] = new_occupancy;
+            check_occupancy();
+            changed_occupancy= 1;
+            char send_index;
+            char send_occupancy;
+            send_occupancy = new_occupancy + '0';
+            send_index = my_index + '0';
+            Wire.beginTransmission(0);
+            Wire.write("O");
+            Wire.write(send_index);
+            Wire.write(send_occupancy);
+            Wire.endTransmission();
+        }
         //Wire.beginTransmission(pi_address);
         //Wire.write("ack");
         //Wire.write('\0');
         //Wire.endTransmission();
-    break;
+        break;
 
-    case 'O':
-    int receive_index;
-    int state_occupancy;
-    receive_index = data[1] - '0';
-    state_occupancy = data[2] - '0';
-    occupancy[receive_index] = state_occupancy;
-    changed_occupancy = 1;
+        case 'O':
+        int receive_index;
+        int state_occupancy;
+        receive_index = data[1] - '0';
+        state_occupancy = data[2] - '0';
+        occupancy[receive_index] = state_occupancy;
+        check_occupancy();
+        changed_occupancy = 1;
 
-    break;
+        break;
 
-    //ANSWER RASPBERRY PI
-    char send_desk;
-    send_desk = desk_number + '0';
-    char send_occupancy;
-    char temp[6];
-    case 'c': //send stream
-      if(data[1]== 'l'){
-        if (stream ==0 || stream ==1)
-          stream = 1; //initialize lux streaming
-       else
-          stream = 3; //initialize both lux and duty cycle streaming
-      }
-      else if(data[1]== 'd'){
-      if (stream ==0 || stream == 2)
-          stream = 2; //streams duty cycle values only
-       else
-          stream = 3; //streams both lux and duty cycle
-      }
-      break;
+        //ANSWER RASPBERRY PI
+        char send_desk;
+        send_desk = desk_number + '0';
+        char send_occupancy;
+        char temp[6];
+        case 'c': //send stream
+        if(data[1]== 'l'){
+            if (stream ==0 || stream ==1)
+            stream = 1; //initialize lux streaming
+            else
+            stream = 3; //initialize both lux and duty cycle streaming
+        }
+        else if(data[1]== 'd'){
+            if (stream ==0 || stream == 2)
+            stream = 2; //streams duty cycle values only
+            else
+            stream = 3; //streams both lux and duty cycle
+        }
+        break;
 
-      case 'd':
-      if(data[1]== 'l'){
-        if (stream ==0 || stream ==1)
-          stream = 0; //stops streaming
-       else
-          stream = 2; //streams duty cycle only
-      }
-      else if(data[1]== 'd'){
-      if (stream ==0 || stream == 2)
-          stream = 0; //stops all streaming
-       else
-          stream = 1; //streams lux only
-      }
-      break;
+        case 'd':
+        if(data[1]== 'l'){
+            if (stream ==0 || stream ==1)
+            stream = 0; //stops streaming
+            else
+            stream = 2; //streams duty cycle only
+        }
+        else if(data[1]== 'd'){
+            if (stream ==0 || stream == 2)
+            stream = 0; //stops all streaming
+            else
+            stream = 1; //streams lux only
+        }
+        break;
 
-      case 'g':
-      if(data[1]== 'l'){ //get lux
-      double lux_value = transform_ADC_in_lux(analogRead(LDRPin));
-      dtostrf(lux_value,4,2,temp);
-      while(control !=0){
-        Wire.beginTransmission(pi_address);
-        Wire.write("l");
-        Wire.write(send_desk);
-        Wire.write(temp, sizeof(temp)); //sends 6 bytes: size of array
-        Wire.write('\0');
-        control= Wire.endTransmission(true);
-      }
-      control = 1;
-      }
-      else if(data[1]== 'o'){
-        send_occupancy = occupancy + '0';
-        while(control !=0){
-        Wire.beginTransmission(pi_address);
-        Wire.write("o");
-        Wire.write(send_desk);
-        Wire.write(send_occupancy); //sends 6 bytes: size of array
-        Wire.write('\0');
-        control= Wire.endTransmission(true);
-      }
-      control = 1;
-      }
+        case 'g':
+        if(data[1]== 'l'){ //get lux
+            double lux_value = transform_ADC_in_lux(analogRead(LDRPin));
+            dtostrf(lux_value,4,2,temp);
+            while(control !=0){
+                Wire.beginTransmission(pi_address);
+                Wire.write("l");
+                Wire.write(send_desk);
+                Wire.write(temp, sizeof(temp)); //sends 6 bytes: size of array
+                Wire.write('\0');
+                control= Wire.endTransmission(true);
+            }
+            control = 1;
+        }
+        else if(data[1]== 'o'){
+            send_occupancy = occupancy + '0';
+            while(control !=0){
+                Wire.beginTransmission(pi_address);
+                Wire.write("o");
+                Wire.write(send_desk);
+                Wire.write(send_occupancy); //sends 6 bytes: size of array
+                Wire.write('\0');
+                control= Wire.endTransmission(true);
+            }
+            control = 1;
+        }
 
-      break;
+        break;
 
-      case 't': //test if pi is receiving
+        case 't': //test if pi is receiving
         Wire.beginTransmission(pi_address);
         Wire.write("OK\0");
         control= Wire.endTransmission(true);
-      break;
+        break;
 
-   //ANSWER ARDUINO
-   case 'E':
-      elements[found_elements].endereco= data[1];
-      found_elements++;
-      break;
+        //ANSWER ARDUINO
+        case 'E':
+        elements[found_elements].endereco= data[1];
+        found_elements++;
+        break;
 
-    case 'C':
-      if (data[1]=='S'){
-        recolhe_valores=1;
-      }
-      if (data[1]=='E'){
-        recolhe_valores=0;
-        calibre_count++;
-      }
-      break;
+        case 'C':
+        if (data[1]=='S'){
+            recolhe_valores=1;
+        }
+        if (data[1]=='E'){
+            recolhe_valores=0;
+            calibre_count++;
+        }
+        break;
 
-    case 'A':
-      acende = true;
-      break;
+        case 'A':
+        acende = true;
+        break;
 
-    case 'D':
+        case 'D':
         int index = (data[1] - '0') -1; //origin desk number - 1
 
         char buffer[7];
@@ -391,7 +389,7 @@ void analyse_request(String data){
         Serial.println("");
         d_broadcast_count++;
         break;
-  }
+    }
 }
 
 void streaming(){
@@ -402,80 +400,80 @@ void streaming(){
     char pwm[6];
     char send_desk;
 
-   switch(stream){
-    case 1: //streams lux values to raspberry pi
-      lux_value = transform_ADC_in_lux(analogRead(LDRPin));
-      dtostrf(lux_value,4,2,temp);
-      dtostrf(millis(),4,0,temp2);
-      send_desk = desk_number + '0';
-      while(control !=0){
-        Wire.beginTransmission(pi_address);
-        Wire.write("cl");
-        Wire.write(send_desk);
-        Wire.write(temp, sizeof(temp)); //sends 6 bytes: size of array
-        Wire.write(temp2, sizeof(temp2)); //sends 6 bytes: size of array
-        Wire.write('\0');
-        control= Wire.endTransmission(true);
-      }
-      control = 1;
-      break;
+    switch(stream){
+        case 1: //streams lux values to raspberry pi
+        lux_value = transform_ADC_in_lux(analogRead(LDRPin));
+        dtostrf(lux_value,4,2,temp);
+        dtostrf(millis(),4,0,temp2);
+        send_desk = desk_number + '0';
+        while(control !=0){
+            Wire.beginTransmission(pi_address);
+            Wire.write("cl");
+            Wire.write(send_desk);
+            Wire.write(temp, sizeof(temp)); //sends 6 bytes: size of array
+            Wire.write(temp2, sizeof(temp2)); //sends 6 bytes: size of array
+            Wire.write('\0');
+            control= Wire.endTransmission(true);
+        }
+        control = 1;
+        break;
 
-    case 2:
-      //pwm_value = (int) 300 + '0';
-      dtostrf(300,4,1,pwm);
-      dtostrf(millis(),4,0,temp2);
-      send_desk = desk_number + '0';
-      while(control !=0){
-        Wire.beginTransmission(pi_address);
-        Wire.write("cd");
-        Wire.write(send_desk);
-        Wire.write(pwm, sizeof(pwm)); //sends 6 bytes
-        //Wire.write((byte *)&pwm_value, sizeof(int));
-        Wire.write(temp2, sizeof(temp2)); //sends 6 bytes: size of array
-        Wire.write('\0');
-        control= Wire.endTransmission(true);
-      }
-      control = 1;
-      break;
+        case 2:
+        //pwm_value = (int) 300 + '0';
+        dtostrf(300,4,1,pwm);
+        dtostrf(millis(),4,0,temp2);
+        send_desk = desk_number + '0';
+        while(control !=0){
+            Wire.beginTransmission(pi_address);
+            Wire.write("cd");
+            Wire.write(send_desk);
+            Wire.write(pwm, sizeof(pwm)); //sends 6 bytes
+            //Wire.write((byte *)&pwm_value, sizeof(int));
+            Wire.write(temp2, sizeof(temp2)); //sends 6 bytes: size of array
+            Wire.write('\0');
+            control= Wire.endTransmission(true);
+        }
+        control = 1;
+        break;
 
-    case 3:
-      //First sends lux
-      lux_value = transform_ADC_in_lux(analogRead(LDRPin));
-      dtostrf(lux_value,4,2,temp);
-      dtostrf(millis(),4,0,temp2);
-      send_desk = desk_number + '0';
-      while(control !=0){
-        Wire.beginTransmission(pi_address);
-        Wire.write("cl");
-        Wire.write(send_desk);
-        Wire.write(temp, sizeof(temp)); //sends 6 bytes: size of array
-        Wire.write(temp2, sizeof(temp2)); //sends 6 bytes: size of array
-        Wire.write('\0');
-        control= Wire.endTransmission(true);
-      }
-      control = 1;
-      //Then sends pwm
-      dtostrf(300,3,0,pwm);
-      dtostrf(millis(),4,0,temp2);
-      send_desk = desk_number + '0';
-      while(control !=0){
-        Wire.beginTransmission(pi_address);
-        Wire.write("cd");
-        Wire.write(send_desk);
-        Wire.write(pwm, sizeof(pwm)); //sends 6 bytes
-        //Wire.write((byte *)&pwm_value, sizeof(int));
-        Wire.write(temp2, sizeof(temp2)); //sends 6 bytes: size of array
-        Wire.write('\0');
-        control= Wire.endTransmission(true);
-      }
-      control = 1;
-      break;
+        case 3:
+        //First sends lux
+        lux_value = transform_ADC_in_lux(analogRead(LDRPin));
+        dtostrf(lux_value,4,2,temp);
+        dtostrf(millis(),4,0,temp2);
+        send_desk = desk_number + '0';
+        while(control !=0){
+            Wire.beginTransmission(pi_address);
+            Wire.write("cl");
+            Wire.write(send_desk);
+            Wire.write(temp, sizeof(temp)); //sends 6 bytes: size of array
+            Wire.write(temp2, sizeof(temp2)); //sends 6 bytes: size of array
+            Wire.write('\0');
+            control= Wire.endTransmission(true);
+        }
+        control = 1;
+        //Then sends pwm
+        dtostrf(300,3,0,pwm);
+        dtostrf(millis(),4,0,temp2);
+        send_desk = desk_number + '0';
+        while(control !=0){
+            Wire.beginTransmission(pi_address);
+            Wire.write("cd");
+            Wire.write(send_desk);
+            Wire.write(pwm, sizeof(pwm)); //sends 6 bytes
+            //Wire.write((byte *)&pwm_value, sizeof(int));
+            Wire.write(temp2, sizeof(temp2)); //sends 6 bytes: size of array
+            Wire.write('\0');
+            control= Wire.endTransmission(true);
+        }
+        control = 1;
+        break;
 
- }
+    }
 
 }
 
-// ---------------------------- Consensus functions -------------------------------- //
+// ------------------------ Consensus functions ----------------------------- //
 
 float local_lux(float *d){
     float L = o[my_index];    // unconstrained solution illuminance at local desk
@@ -529,13 +527,13 @@ void feedforwardConsensus(){
 
     // ---------------------- DEBUG (unconstrained)  ------------------------ //
     //
-    // float f_unconstrained = cost_function(d_unconstrained);
-    // for(int i=0; i<found_elements; i++){
-    //     Serial.println(d_unconstrained[i]);
-    // }
-    // Serial.println(f_unconstrained);
-    // Serial.println(" ");
-    // Serial.flush();
+    float f_unconstrained = cost_function(d_unconstrained);
+    for(int i=0; i<found_elements; i++){
+        Serial.println(d_unconstrained[i]);
+    }
+    Serial.println(f_unconstrained);
+    Serial.println(" ");
+    Serial.flush();
     //
     // ---------------------------------------------------------------------- //
 
@@ -595,13 +593,13 @@ void feedforwardConsensus(){
 
     // ------------------------  DEBUG (linear)  ---------------------------- //
     //
-    // f_linear = cost_function(d_linear);
-    // for(int i=0; i<found_elements; i++){
-    //     Serial.println(d_linear[i]);
-    // }
-    // Serial.println(f_linear);
-    // Serial.println(" ");
-    // Serial.flush();
+    f_linear = cost_function(d_linear);
+    for(int i=0; i<found_elements; i++){
+        Serial.println(d_linear[i]);
+    }
+    Serial.println(f_linear);
+    Serial.println(" ");
+    Serial.flush();
     //
     // ---------------------------------------------------------------------- //
 
@@ -635,13 +633,13 @@ void feedforwardConsensus(){
 
     // -------------------------  DEBUG (dcmin)  ---------------------------- //
     //
-    // f_dcmin = cost_function(d_dcmin);
-    // for(int i=0; i<found_elements; i++){
-    //     Serial.println(d_dcmin[i]);
-    // }
-    // Serial.println(f_dcmin);
-    // Serial.println(" ");
-    // Serial.flush();
+    f_dcmin = cost_function(d_dcmin);
+    for(int i=0; i<found_elements; i++){
+        Serial.println(d_dcmin[i]);
+    }
+    Serial.println(f_dcmin);
+    Serial.println(" ");
+    Serial.flush();
     //
     // ---------------------------------------------------------------------- //
 
@@ -675,13 +673,13 @@ void feedforwardConsensus(){
 
     // -------------------------  DEBUG (dcmax)  ---------------------------- //
     //
-    // f_dcmax = cost_function(d_dcmax);
-    // for(int i=0; i<found_elements; i++){
-    //     Serial.println(d_dcmax[i]);
-    // }
-    // Serial.println(f_dcmax);
-    // Serial.println(" ");
-    // Serial.flush();
+    f_dcmax = cost_function(d_dcmax);
+    for(int i=0; i<found_elements; i++){
+        Serial.println(d_dcmax[i]);
+    }
+    Serial.println(f_dcmax);
+    Serial.println(" ");
+    Serial.flush();
     //
     // ---------------------------------------------------------------------- //
 
@@ -727,13 +725,13 @@ void feedforwardConsensus(){
 
     // ----------------------- DEBUG (linear, dcmin)  ----------------------- //
     //
-    // f_linear_dcmin = cost_function(d_linear_dcmin);
-    // for(int i=0; i<found_elements; i++){
-    //     Serial.println(d_linear_dcmin[i]);
-    // }
-    // Serial.println(f_linear_dcmin);
-    // Serial.println(" ");
-    // Serial.flush();
+    f_linear_dcmin = cost_function(d_linear_dcmin);
+    for(int i=0; i<found_elements; i++){
+        Serial.println(d_linear_dcmin[i]);
+    }
+    Serial.println(f_linear_dcmin);
+    Serial.println(" ");
+    Serial.flush();
     //
     // ---------------------------------------------------------------------- //
 
@@ -747,7 +745,7 @@ void feedforwardConsensus(){
             d_linear_dcmax[i] = d_linear_dcmin[i] - 100*(elements[i].ganho)*(elements[my_index].ganho)*g/rho;
         }
         else if(i==my_index){
-            d_linear_dcmax[i] = d_linear_dcmin[i] + 100*kr2;
+            d_linear_dcmax[i] = d_linear_dcmin[i] + 100*kr2*g/rho;      //  <-- (solved) BUG - faltava multiplicar 100k*r2 por g/rho
         }
     }
 
@@ -766,13 +764,13 @@ void feedforwardConsensus(){
 
     // ----------------------- DEBUG (linear, dcmax)  ----------------------- //
     //
-    // f_linear_dcmax = cost_function(d_linear_dcmax);
-    // for(int i=0; i<found_elements; i++){
-    //     Serial.println(d_linear_dcmax[i]);
-    // }
-    // Serial.println(f_linear_dcmax);
-    // Serial.println(" ");
-    // Serial.flush();
+    f_linear_dcmax = cost_function(d_linear_dcmax);
+    for(int i=0; i<found_elements; i++){
+        Serial.println(d_linear_dcmax[i]);
+    }
+    Serial.println(f_linear_dcmax);
+    Serial.println(" ");
+    Serial.flush();
     //
     // ---------------------------------------------------------------------- //
 
@@ -803,14 +801,14 @@ void compute_d_av(){
         }
         d_av[j] /= found_elements;
         // ----------- DEBUG ------------ //
-        // Serial.print("d(");
-        // Serial.print(j);
-        // Serial.print(") = ");
-        // Serial.print(d[j]);
-        // Serial.print("\t\t d_av(");
-        // Serial.print(j);
-        // Serial.print(") = ");
-        // Serial.println(d_av[j]);
+        Serial.print("d(");
+        Serial.print(j);
+        Serial.print(") = ");
+        Serial.print(d[j]);
+        Serial.print("\t\t d_av(");
+        Serial.print(j);
+        Serial.print(") = ");
+        Serial.println(d_av[j]);
         // ----------------------------- //
     }
     // Serial.println("");
@@ -820,10 +818,10 @@ void update_y(){
     for(int i=0; i<found_elements; i++){
         y[i] += rho*(d[i]-d_av[i]);
         // ----------- DEBUG ------------ //
-        // Serial.print("y(");
-        // Serial.print(i);
-        // Serial.print(") = ");
-        // Serial.println(y[i]);
+        Serial.print("y(");
+        Serial.print(i);
+        Serial.print(") = ");
+        Serial.println(y[i]);
         // ----------------------------- //
     }
     // Serial.println("");
@@ -851,11 +849,11 @@ void broadcast_d(){
                 Wire.beginTransmission(0);
                 Wire.write('D');
                 Wire.write(send_mydesk);
-                    for(int i=0; i<found_elements; i++){
-                        char temp[6];
-                        dtostrf(d[i],6,3,temp);
-                        Wire.write(temp, sizeof(temp));
-                    }
+                for(int i=0; i<found_elements; i++){
+                    char temp[6];
+                    dtostrf(d[i],6,3,temp);
+                    Wire.write(temp, sizeof(temp));
+                }
                 control = Wire.endTransmission(true);
             }
             control = 1;
@@ -884,14 +882,20 @@ void broadcast_d(){
 
 // --------------------------- Other functions ------------------------------ //
 
-
-float compute_Lref(){
+void compute_Lref(){
     Lref = 0;
     for(int i=0; i<found_elements; i++){
         Lref += (elements[i].ganho)*d[i];
+        // Serial.print(elements[i].ganho);
+        // Serial.print('\t');
+        // Serial.print(d[i]);
+        // Serial.print('\t');
+        // Serial.println(Lref);
     }
     Lref += o[my_index];
-    return Lref;
+    // Serial.print(o[my_index]);
+    // Serial.print('\t');
+    // Serial.println(Lref);
 }
 
 void compute_stats(){
@@ -924,120 +928,122 @@ void compute_stats(){
 }
 
 void check_occupancy(){
-  for(int i=0; i<found_elements; i++)
+    for(int i=0; i<found_elements; i++){
     if(occupancy[i] == 0){
-      Lmin[i] = ref_LOW;
+        Lmin[i] = ref_LOW;
     }
     else if(occupancy[i] == 1){
-      Lmin[i] = ref_HIGH;
+        Lmin[i] = ref_HIGH;
     }
- }
+}
+}
 
 float PI_controler(float Lref, float measured_lux, float ff_value){
 
-  float outputValue_0;
-  error_0 = Lref - measured_lux;
+    float outputValue_0;
+    error_0 = Lref - measured_lux;
 
-if (abs(error_0) < 2)
-{
-  error_0 = 0;
+    if (abs(error_0) < 2)
+    {
+        error_0 = 0;
+    }
+
+    //P Controller
+
+    P = Kp*error_0;
+
+    //PI Controller
+
+    I = I_1 + 0.5*Kp*Ki*T_s*(error_0 + error_1);
+
+    //PD Controller
+
+    D = (Kd/(Kd+a*T_s))*D_1 - Kp*Kd*a*(outputValue_0-outputValue_1)/(Kd + a*T_s);
+
+    //Complete Controller
+
+    C = P + I ;
+
+    outputValue_0 = C + ff_value;
+
+    if(outputValue_0  < 0)
+    {
+        outputValue_0 = 0;
+        u = 0;
+        I_1 = I + Kc*(u-C-ff_value);
+    }
+    else if(outputValue_0 > 255)
+    {
+        outputValue_0 = 255;
+        u = 255;
+        I_1 = I + Kc*(u-C-ff_value);
+    }
+    else{
+        I_1 = I;
+    }
+
+
+    outputValue_1 = outputValue_0;
+    error_1 = error_0;
+    D_1 = D;
+
+    return outputValue_0;  //Value to write in the led
 }
 
-//P Controller
-
-P = Kp*error_0;
-
-//PI Controller
-
-I = I_1 + 0.5*Kp*Ki*T_s*(error_0 + error_1);
-
-//PD Controller
-
-D = (Kd/(Kd+a*T_s))*D_1 - Kp*Kd*a*(outputValue_0-outputValue_1)/(Kd + a*T_s);
-
-//Complete Controller
-
-C = P + I ;
-
-outputValue_0 = C + ff_value;
-
-if(outputValue_0  < 0)
-{
-  outputValue_0 = 0;
-  u = 0;
-  I_1 = I + Kc*(u-C-ff_value);
-}
-else if(outputValue_0 > 255)
-{
-  outputValue_0 = 255;
-  u = 255;
-  I_1 = I + Kc*(u-C-ff_value);
-}
-else{
-  I_1 = I;
-}
-
-
-outputValue_1 = outputValue_0;
-error_1 = error_0;
-D_1 = D;
-
-return outputValue_0;  //Value to write in the led
-}
-
+// ----------------------------- Setup / Loop ------------------------------- //
 
 void setup() {
 
-  int n=0;
+    int n=0;
 
 
-  Serial.begin(9600);
-  Serial.println("Begin Setup");
-  pinMode(LED_BUILTIN, OUTPUT);
-  pinMode(2,INPUT_PULLUP);
-  pinMode(3,INPUT_PULLUP);
-  pinMode(4,INPUT_PULLUP);
-  pinMode(5,INPUT_PULLUP);
-  pinMode(6,INPUT_PULLUP);
-  pinMode(7,INPUT_PULLUP);
-  pinMode(8,INPUT_PULLUP);
+    Serial.begin(9600);
+    Serial.println("-------------------- Begin setup ------------------------\n");
+    pinMode(LED_BUILTIN, OUTPUT);
+    pinMode(2,INPUT_PULLUP);
+    pinMode(3,INPUT_PULLUP);
+    pinMode(4,INPUT_PULLUP);
+    pinMode(5,INPUT_PULLUP);
+    pinMode(6,INPUT_PULLUP);
+    pinMode(7,INPUT_PULLUP);
+    pinMode(8,INPUT_PULLUP);
 
-  digitalWrite(LED_BUILTIN,HIGH);
-  delay(500);
-  digitalWrite(LED_BUILTIN,LOW);
-
-
-  // Various initialization processes needed (such as reading adress pins, enabling general call, and using builtin led for control purposes)
-
-  for (int i=2; i <= 8; i++){
-    bitWrite(address, n, !digitalRead(i));
-    n++;
-  }//reading the address coded in digital ports from 2 to 8
-
-  elements[0].endereco=address;  //Saving own address
-  Wire.begin(address);  //Initialize I2C comunications
-  Wire.onReceive(receiveEvent);
-  bitSet(TWAR, TWGCE);  //Enable general call
-  delay(100);
-
-  propagate_address(address);               //Propagates the address so its know by everyone
-
-  t_0=micros();
-  while(diff<500000)
-  {
-    diff=micros()-t_0;
-  }
-
-  sort_copy(&elements[0],found_elements);   //Sort found addresses for use in calibration
-  calibracao(&elements[0],found_elements);  //Calibration
+    digitalWrite(LED_BUILTIN,HIGH);
+    delay(500);
+    digitalWrite(LED_BUILTIN,LOW);
 
 
-     // CONSENSUS: System / cost function variables initialization
-     for(int i=0; i<found_elements; i++){
-         //Lmin[i] = 160;
-         c[i] = 1;           // Unit cost, equal for all luminaires
-         Q[i] = 1;           // Unit cost, equal for all luminaires
-     }
+    // Various initialization processes needed (such as reading adress pins, enabling general call, and using builtin led for control purposes)
+
+    for (int i=2; i <= 8; i++){
+        bitWrite(address, n, !digitalRead(i));
+        n++;
+    }//reading the address coded in digital ports from 2 to 8
+
+    elements[0].endereco=address;  //Saving own address
+    Wire.begin(address);  //Initialize I2C comunications
+    Wire.onReceive(receiveEvent);
+    bitSet(TWAR, TWGCE);  //Enable general call
+    delay(100);
+
+    propagate_address(address);               //Propagates the address so its know by everyone
+
+    t_0=micros();
+    while(diff<500000)
+    {
+        diff=micros()-t_0;
+    }
+
+    sort_copy(&elements[0],found_elements);   //Sort found addresses for use in calibration
+    calibracao(&elements[0],found_elements);  //Calibration
+
+
+    // CONSENSUS: System / cost function variables initialization
+    for(int i=0; i<found_elements; i++){
+        //Lmin[i] = 160;
+        c[i] = 1;           // Unit cost, equal for all luminaires
+        Q[i] = 1;           // Unit cost, equal for all luminaires
+    }
 
     // CONSENSUS : ADMM auxiliary variables initialization
     for(int i=0; i<found_elements; i++){
@@ -1049,131 +1055,146 @@ void setup() {
         }
     }
 
-  analogWrite(LedPin,0);
-  delay(1000);
-  o[my_index] = transform_ADC_in_lux(sampleADC());
+    analogWrite(LedPin,0);
+    delay(1000);
+    o[my_index] = transform_ADC_in_lux(sampleADC());
 
-  //Serial.println(o[my_index]);
-  Serial.println("Setup ended");
-  //analogWrite(LedPin,PWM_Calibre);
-  t0 = millis();
+    Serial.print("Desk: ");
+    Serial.print(my_index+1);
+    for(int i=0; i<found_elements; i++){
+        Serial.print("\t K");
+        Serial.print(my_index+1);
+        Serial.print(i+1);
+        Serial.print(": ");
+        Serial.print(elements[i].ganho);
+    }
+    Serial.print("\to");
+    Serial.print(my_index+1);
+    Serial.print(": ");
+    Serial.println(o[my_index]);
+    Serial.println("");
+    Serial.println("-------------------- Setup ended ------------------------\n");
+    //analogWrite(LedPin,PWM_Calibre);
 }
-
 
 void loop() {
+    t0 = micros();
+    check_occupancy();
 
-check_occupancy();
-
-  if(Serial.available()> 0){
-    analyse_serial();
-  }
-
-if(distributed_control == false){
-  if (occupancy[my_index] == 1){
-    ff_value = ref_HIGH* feed_gain;
-    Lref = ref_HIGH;
-  }
-  else if(occupancy[my_index] == 0){
-  ff_value = ref_LOW * feed_gain;
-  Lref= ref_LOW;
-}
-
-
-current_lux = transform_ADC_in_lux(sampleADC());
-
-pwm =  PI_controler(Lref, current_lux, ff_value);
-
-analogWrite(LedPin, pwm);
-}
-else{
-
-  if(changed_occupancy){
-
-  //CONSENSUS
-
-    int iterations = 20;
-    for(int i=1; i<=iterations; i++){
-
-        // ----------- DEBUG Top ------------ //
-        Serial.println("\n--------------------------------------------");
-        Serial.print("\t\tIteration: ");
-        Serial.println(i);
-        Serial.println("--------------------------------------------\n");
-        // ---------------------------------- //
-
-        // compute duty-cycles vector, d
-        feedforwardConsensus();
-        // update duty cycle array, d
-        update_d_copies();
-        // compute average duty-cycles vector, d_av
-        compute_d_av();
-        // update local lagrangian, y
-        update_y();
-        // broadcast / receive computed 'd' vectors
-        broadcast_d();
+    if(Serial.available()> 0){
+        analyse_serial();
     }
-    Serial.println("Finished!");
-    Serial.println("");
-    Serial.println("Lref: \t Lux: \t ff_value: \t pwm:");
+
+    if(distributed_control == false){
+        if (occupancy[my_index] == 1){
+            ff_value = ref_HIGH* feed_gain;
+            Lref = ref_HIGH;
+        }
+        else if(occupancy[my_index] == 0){
+            ff_value = ref_LOW * feed_gain;
+            Lref= ref_LOW;
+        }
 
 
-  Lref = compute_Lref();
-  ff_value = d[my_index];
-  changed_occupancy = 0;
-  }
+        current_lux = transform_ADC_in_lux(sampleADC());
 
-  current_lux = transform_ADC_in_lux(sampleADC());
-  pwm =  PI_controler(Lref, current_lux, ff_value);
-  analogWrite(LedPin, 2.55*pwm);
+        pwm =  PI_controler(Lref, current_lux, ff_value);
 
-}
+        analogWrite(LedPin, pwm);
+    }
+    else{
 
-//Serial.println(pwm);
+        if(changed_occupancy){
+            // RESET CONSENSUS VARIABLES
+            for(int i=0; i<found_elements; i++){
+                y[i] = 0;
+                d[i] = 0;
+                d_av[i] = 0;
+                for(int j=0; j<found_elements; j++){
+                    d_copies[i][j] = 0;
+                }
+            }
 
+            // RUN CONSENSUS ALGORITHM
+            int iterations = 20;
+            for(int i=1; i<=iterations; i++){
 
-  if(acende==true){
-  digitalWrite(LED_BUILTIN,HIGH);
-  delay(500);
-  digitalWrite(LED_BUILTIN,LOW);
-  acende = false;
-  }
+                // ----------- DEBUG Top ------------ //
+                Serial.println("\n--------------------------------------------");
+                Serial.print("\t\tIteration: ");
+                Serial.println(i);
+                Serial.println("--------------------------------------------\n");
+                Serial.flush();
+                // ---------------------------------- //
+                // compute duty-cycles vector, d
+                feedforwardConsensus();
+                // update duty cycle array, d
+                update_d_copies();
+                // compute average duty-cycles vector, d_av
+                compute_d_av();
+                // update local lagrangian, y
+                update_y();
+                // broadcast / receive computed 'd' vectors
+                broadcast_d();
+            }
+            Serial.println("");
+            Serial.println("Finished!");
+            Serial.println("");
 
-  //CONSENSUS CALCULATIONS
+            compute_Lref();
+                // Serial.println("");
+                // Serial.println(Lref);
+                // Serial.println("");
+            ff_value = d[my_index];
+            changed_occupancy = 0;
+        }
 
-/*
-  Serial.print("My index is: ");
-  Serial.println(my_index);
-  Serial.println(elements[0].ganho);
-  Serial.println(elements[1].ganho); */
+        current_lux = transform_ADC_in_lux(sampleADC());
+        pwm =  PI_controler(Lref, current_lux, 2.55*ff_value);
+        analogWrite(LedPin, pwm);
 
+    }
 
+    if(acende==true){
+        digitalWrite(LED_BUILTIN,HIGH);
+        delay(500);
+        digitalWrite(LED_BUILTIN,LOW);
+        acende = false;
+    }
 
+    if(stream !=0){
+        streaming();
+    }
 
+    if(distributed_control){
+        Serial.print("Lmin: ");
+        Serial.print(Lmin[my_index]);
+        Serial.print('\t');
+        Serial.print("Lref: ");
+        Serial.print(Lref);
+        Serial.print('\t');
+        Serial.print("Lux: ");
+        Serial.print(transform_ADC_in_lux(analogRead(LDRPin)));
+        Serial.print('\t');
+        Serial.print("Feedforward: ");
+        Serial.print(ff_value);
+        Serial.print('\t');
+        Serial.print("PWM: ");
+        Serial.println(pwm);
+    }
+    else{
+        Serial.print("Lref: ");
+        Serial.print(Lref);
+        Serial.print('\t');
+        Serial.print("Lux: ");
+        Serial.print(current_lux);//transform_ADC_in_lux(analogRead(LDRPin)));
+        Serial.print('\t');
+        Serial.print("PWM: ");
+        Serial.println(pwm);
+    }
 
-
-  if(stream !=0){
-    streaming();
-  }
-
-
-  //Serial.print(" \n");
-  //for (int j=0;j<found_elements;j++){
-    //Serial.print("Endereco: ");
-    //Serial.print(elements[j].endereco);
-    //Serial.print("\t");
-    //Serial.print("Ganho: ");
-    //Serial.print(elements[j].ganho);
-    //Serial.print("\t");
-    //Serial.println(j);
-    //Serial.println(transform_ADC_in_lux(analogRead(LDRPin)));
-  //}
-  Serial.print(Lref);
-  Serial.print('\t');
-  Serial.print(transform_ADC_in_lux(analogRead(LDRPin)));
-  Serial.print('\t');
-  Serial.print(ff_value);
-  Serial.print('\t');
-  Serial.println(pwm);
-  delay(T_s);
-
+    dt = micros()-t0;
+    if(dt>0){
+        delayMicroseconds(T_us-dt);
+    }
 }

@@ -24,8 +24,8 @@ float d_av[N_ELEMENTS];                 // Duty cycles average, for all arduinos
 float d_copies[N_ELEMENTS][N_ELEMENTS]; // Duty cycles buffer, for all arduinos
 
 // MUDAR PARA CADA ARDUINO              <-------------------
-int my_index = 1;                                           // 1
-arduino_info elements[N_ELEMENTS] = {{20, 1}, {21, 2}};     // {{20, 1}, {21, 2}}
+int my_index = 0;                                           // 1
+arduino_info elements[N_ELEMENTS] = {{20, 2}, {21, 1}};     // {{20, 1}, {21, 2}}
 
 // Other variables
 union float_as_bytes {  byte b[4];   float fval;};
@@ -90,13 +90,13 @@ void feedforwardConsensus(){
 
     // ---------------------- DEBUG (unconstrained)  ------------------------ //
     //
-    // float f_unconstrained = cost_function(d_unconstrained);
-    // for(int i=0; i<found_elements; i++){
-    //     Serial.println(d_unconstrained[i]);
-    // }
-    // Serial.println(f_unconstrained);
-    // Serial.println(" ");
-    // Serial.flush();
+    float f_unconstrained = cost_function(d_unconstrained);
+    for(int i=0; i<found_elements; i++){
+        Serial.println(d_unconstrained[i]);
+    }
+    Serial.println(f_unconstrained);
+    Serial.println(" ");
+    Serial.flush();
     //
     // ---------------------------------------------------------------------- //
 
@@ -156,13 +156,13 @@ void feedforwardConsensus(){
 
     // ------------------------  DEBUG (linear)  ---------------------------- //
     //
-    // f_linear = cost_function(d_linear);
-    // for(int i=0; i<found_elements; i++){
-    //     Serial.println(d_linear[i]);
-    // }
-    // Serial.println(f_linear);
-    // Serial.println(" ");
-    // Serial.flush();
+    f_linear = cost_function(d_linear);
+    for(int i=0; i<found_elements; i++){
+        Serial.println(d_linear[i]);
+    }
+    Serial.println(f_linear);
+    Serial.println(" ");
+    Serial.flush();
     //
     // ---------------------------------------------------------------------- //
 
@@ -196,13 +196,13 @@ void feedforwardConsensus(){
 
     // -------------------------  DEBUG (dcmin)  ---------------------------- //
     //
-    // f_dcmin = cost_function(d_dcmin);
-    // for(int i=0; i<found_elements; i++){
-    //     Serial.println(d_dcmin[i]);
-    // }
-    // Serial.println(f_dcmin);
-    // Serial.println(" ");
-    // Serial.flush();
+    f_dcmin = cost_function(d_dcmin);
+    for(int i=0; i<found_elements; i++){
+        Serial.println(d_dcmin[i]);
+    }
+    Serial.println(f_dcmin);
+    Serial.println(" ");
+    Serial.flush();
     //
     // ---------------------------------------------------------------------- //
 
@@ -236,13 +236,13 @@ void feedforwardConsensus(){
 
     // -------------------------  DEBUG (dcmax)  ---------------------------- //
     //
-    // f_dcmax = cost_function(d_dcmax);
-    // for(int i=0; i<found_elements; i++){
-    //     Serial.println(d_dcmax[i]);
-    // }
-    // Serial.println(f_dcmax);
-    // Serial.println(" ");
-    // Serial.flush();
+    f_dcmax = cost_function(d_dcmax);
+    for(int i=0; i<found_elements; i++){
+        Serial.println(d_dcmax[i]);
+    }
+    Serial.println(f_dcmax);
+    Serial.println(" ");
+    Serial.flush();
     //
     // ---------------------------------------------------------------------- //
 
@@ -288,13 +288,13 @@ void feedforwardConsensus(){
 
     // ----------------------- DEBUG (linear, dcmin)  ----------------------- //
     //
-    // f_linear_dcmin = cost_function(d_linear_dcmin);
-    // for(int i=0; i<found_elements; i++){
-    //     Serial.println(d_linear_dcmin[i]);
-    // }
-    // Serial.println(f_linear_dcmin);
-    // Serial.println(" ");
-    // Serial.flush();
+    f_linear_dcmin = cost_function(d_linear_dcmin);
+    for(int i=0; i<found_elements; i++){
+        Serial.println(d_linear_dcmin[i]);
+    }
+    Serial.println(f_linear_dcmin);
+    Serial.println(" ");
+    Serial.flush();
     //
     // ---------------------------------------------------------------------- //
 
@@ -327,13 +327,13 @@ void feedforwardConsensus(){
 
     // ----------------------- DEBUG (linear, dcmax)  ----------------------- //
     //
-    // f_linear_dcmax = cost_function(d_linear_dcmax);
-    // for(int i=0; i<found_elements; i++){
-    //     Serial.println(d_linear_dcmax[i]);
-    // }
-    // Serial.println(f_linear_dcmax);
-    // Serial.println(" ");
-    // Serial.flush();
+    f_linear_dcmax = cost_function(d_linear_dcmax);
+    for(int i=0; i<found_elements; i++){
+        Serial.println(d_linear_dcmax[i]);
+    }
+    Serial.println(f_linear_dcmax);
+    Serial.println(" ");
+    Serial.flush();
     //
     // ---------------------------------------------------------------------- //
 
@@ -364,30 +364,30 @@ void compute_d_av(){
         }
         d_av[j] /= found_elements;
         // ----------- DEBUG ------------ //
-        // Serial.print("d(");
-        // Serial.print(j);
-        // Serial.print(") = ");
-        // Serial.print(d[j]);
-        // Serial.print("\t\t d_av(");
-        // Serial.print(j);
-        // Serial.print(") = ");
-        // Serial.println(d_av[j]);
+        Serial.print("d(");
+        Serial.print(j);
+        Serial.print(") = ");
+        Serial.print(d[j]);
+        Serial.print("\t\t d_av(");
+        Serial.print(j);
+        Serial.print(") = ");
+        Serial.println(d_av[j]);
         // ----------------------------- //
     }
-    // Serial.println("");
+    Serial.println("");
 }
 
 void update_y(){
     for(int i=0; i<found_elements; i++){
         y[i] += rho*(d[i]-d_av[i]);
         // ----------- DEBUG ------------ //
-        // Serial.print("y(");
-        // Serial.print(i);
-        // Serial.print(") = ");
-        // Serial.println(y[i]);
+        Serial.print("y(");
+        Serial.print(i);
+        Serial.print(") = ");
+        Serial.println(y[i]);
         // ----------------------------- //
     }
-    // Serial.println("");
+    Serial.println("");
 }
 
 void update_d_copies(){
@@ -622,7 +622,7 @@ void setup() {
 }
 
 void loop() {
-    int iterations = 20;
+    int iterations = 5;
     for(int i=1; i<=iterations; i++){
 
         // ----------- DEBUG Top ------------ //
