@@ -902,8 +902,9 @@ void broadcast_d(){
 float compute_Lref(){
     Lref = 0;
     for(int i=0; i<found_elements; i++){
-        Lref += (elements[i].ganho)*d[i] + o[i];
+        Lref += (elements[i].ganho)*d[i];
     }
+    Lref += o[my_index];
     return Lref;
 }
 
