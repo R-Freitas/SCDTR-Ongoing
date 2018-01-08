@@ -1,10 +1,12 @@
 close all, clear all; clc; format shortg;
 
+
 % SYSTEM / COST FUNCTION 
 % k11 = 2; k12 = 1; k21 = 1; k22 = 2;
 % L1 = 150; o1 = 30; L2 = 80; o2 = 0;
-k11 = 1.84; k12 = 0.39; k21 = 0.40; k22 = 2.61;
-L1 = 90; o1 = 0.02; L2 = 90; o2 = 0.02;
+k11 = 1.77; k12 = 0.37; k21 = 0.40; k22 = 2.61;
+o1 = 0.02; o2 = 0.02;
+L1 = 90; L2 = 170; 
 K = [k11, k12 ; k21 , k22];
 L = [L1;L2]; o = [o1;o2];
 
@@ -15,7 +17,7 @@ c = [c1 c2]; Q = [q1 0; 0 q2];
 %                 SOLVE WITH CONSENSUS
 % ----------------------------------------------------- %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-rho = 0.6;     
+rho = 0.15;     
 % ----------------------------------------------------- %
 %node 1 initialization
 d1 = [0;0];             % d[N_ELEMENTS]
@@ -33,7 +35,7 @@ k2 = [k21;k22];
 % ----------------------------------------------------- %
 
 %iterations
-iterations = 20;
+iterations = 15;
 for i=1:iterations,
   % node 1
    d11_best = -1; % d_best
@@ -423,31 +425,31 @@ end;
 
 %% Print buffers
 
-disp('-----------------------------------------------------------');
+% disp('-----------------------------------------------------------');
 
-buffer1_u
-buffer1_l
-buffer1_b0
-buffer1_b100
-buffer1_l0
-buffer1_l100
-
-buffer_d1
-buffer_d1_av
-buffer_y1
-
-disp('-----------------------------------------------------------');
-
-buffer2_u
-buffer2_l
-buffer2_b0
-buffer2_b100
-buffer2_l0
-buffer2_l100
-
-buffer_d2
-buffer_d2_av
-buffer_y2
+% buffer1_u
+% buffer1_l
+% buffer1_b0
+% buffer1_b100
+% buffer1_l0
+% buffer1_l100
+% 
+% buffer_d1
+% buffer_d1_av
+% buffer_y1
+% 
+% disp('-----------------------------------------------------------');
+% 
+% buffer2_u
+% buffer2_l
+% buffer2_b0
+% buffer2_b100
+% buffer2_l0
+% buffer2_l100
+% 
+% buffer_d2
+% buffer_d2_av
+% buffer_y2
 
 
 % SOLVE WITH MATLAB QUADPROG
@@ -465,13 +467,15 @@ d_copies
 
 % % PLOTS
 figure(10);
-plot(1:iterations, av1, 1:iterations, av2);
+plot(1:iterations, av1, 1:iterations, av2, 'LineWidth',2);
 grid minor;
 legend('d_1','d_2');
-title(sprintf('Evolution of primal variables (rho = %f)', rho));
+title(sprintf('Evolution of primal variables (rho = %f, L1 = %f, L2 = %f)', rho, L1, L2));
 xlabel('Iteration');
 ylabel('Duty cycle [%]')
+ylim([0,100])
 set(gcf, 'Position', get(0, 'Screensize'));
+hold on
 
 figure(15);
 t = 0:100;
@@ -496,4 +500,3 @@ axis([-10,110,-10,110]);
 hold off;
 set(gcf, 'Position', get(0, 'Screensize'));
 
-% close all
