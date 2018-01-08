@@ -6,7 +6,7 @@ const int LedPin = 9;
 const int LDRPin = A0;
 
 union float_as_bytes {
-  byte b[4]; 
+  byte b[4];
   float fval;};
 
 struct arduino_info {
@@ -20,7 +20,7 @@ double T_s  = 0.03;
 
 //CONTROLER VARIABLES
 float error_0 = 0;     // (k)-th error value [lux]
-float error_1 = 0;     // (k-1)-th error value [lux] 
+float error_1 = 0;     // (k-1)-th error value [lux]
 float outputValue_1 = 0; // (k-1)-th value output to the PWM (analog out)
 float I = 0;
 float I_1 = 0;
@@ -46,7 +46,7 @@ double feed_gain= 1.03;
 float Lref;
 float pwm;
 float current_lux;
-bool distributed_control = false;
+bool distributed_control = true;
 
 //I2C VARIABLES
 int address=0;
@@ -113,7 +113,7 @@ void analyse_serial(){
   }
 
   Serial.println(data);
-  Serial.print(sizeof(data));  
+  Serial.print(sizeof(data));
   //data = Serial.readString();
 
   if(sizeof(data)>1){
@@ -124,22 +124,19 @@ void analyse_serial(){
     else{
       if(elements[received_ad-1].endereco){ //checks if the desk_number exists
         int send_to = elements[received_ad-1].endereco;
-        while(control !=0){
           Wire.beginTransmission(send_to);
           Wire.write(data.c_str());
-          control= Wire.endTransmission(true);
+          Wire.endTransmission();
         }
-      control = 1;
       }
   }
  }
-}
 
 void sort_copy (arduino_info* arr, int size){
   for (int k=0; k<(size-1);k++){
     for (int w=0; w<(size-(k+1));w++){
       if (arr[w].endereco > arr[w+1].endereco){
-        arduino_info temp; 
+        arduino_info temp;
         temp.endereco= arr[w].endereco;
         arr[w].endereco=arr[w+1].endereco;
         arr[w+1].endereco=temp.endereco;
@@ -149,55 +146,55 @@ void sort_copy (arduino_info* arr, int size){
 
 }
 
-double sampleADC(){ 
+double sampleADC(){
   double Value = 0;
   for (int k=0;k<10;k++)
   {
     Value += analogRead(LDRPin);
-  } 
+  }
   Value /= 10;
   return Value;
 }
 
 void calibracao (arduino_info* elements, int found_elements){
-  
-  
+
+
   while (calibre_count<found_elements){
     if (elements[calibre_count].endereco == address){
       desk_number = calibre_count +1;
       my_index = calibre_count;
       analogWrite(LedPin,PWM_Calibre);  //liga led
-      
+
       t_0=micros();//Waits to ensure everything is read (se calhar considerar resposta para garantir comunicação)
       diff=0;
       while(diff<1000000){
         diff=micros()-t_0;
       }
-      
+
       while (control != 0){ //Transmite mensagem para os outros colocarem a escuta
         Wire.beginTransmission(0);
-        Wire.write("CS");        
-        control = Wire.endTransmission(true); 
+        Wire.write("CS");
+        control = Wire.endTransmission(true);
       }
       control=1;
 
       elements[calibre_count].ganho = sampleADC();  //Lê valores
-      
+
       t_0=micros();//Waits to ensure everything is read (se calhar considerar resposta para garantir comunicação)
       diff=0;
       while(diff<1000000){
         diff=micros()-t_0;
       }
-      
+
       analogWrite(LedPin,0);//Desliga Led
-      
+
       while (control != 0){ //Transmite mensagem de flag para sairem de escuta
         Wire.beginTransmission(0);
-        Wire.write("CE");        
+        Wire.write("CE");
         control = Wire.endTransmission(true);
       }
       control=1;
-      
+
       calibre_count++; //incrementa
 
     }
@@ -209,7 +206,7 @@ void calibracao (arduino_info* elements, int found_elements){
       }
       digitalWrite(LED_BUILTIN,LOW);
     }
-  
+
   }
   for (int i=0;i<found_elements;i++){
     elements[i].ganho= transform_ADC_in_lux(elements[i].ganho)/100;
@@ -220,13 +217,13 @@ void propagate_address(int address){
   while (control != 0){
     Wire.beginTransmission(0);
     Wire.write('E');
-    Wire.write(address);      
+    Wire.write(address);
     control = Wire.endTransmission(true);
-    
+
   }
   control=1;
-  
-  
+
+
 }
 
 double transform_ADC_in_lux(double sensorValue){
@@ -237,12 +234,12 @@ double transform_ADC_in_lux(double sensorValue){
   R_LDR = (10/V_sensorValue)*(5-V_sensorValue);
   lux = pow(10,b)*pow(R_LDR,m);
   return lux;
-  
+
 }
 
 void receiveEvent(int numBytes){
-  String request="";   
-  
+  String request="";
+
   while(Wire.available()){
     request += (char) Wire.read();
   }
@@ -261,26 +258,20 @@ void analyse_request(String data){
     if(occupancy[my_index] != new_occupancy){
      occupancy[my_index] = new_occupancy;
      changed_occupancy= 1;
-     for(int i=0; i< found_elements; i++){
-      if(i != my_index){
         char send_index;
         char send_occupancy;
         send_occupancy = new_occupancy + '0';
         send_index = my_index + '0';
-        while(control !=0){
-          Wire.beginTransmission(elements[i].endereco);
+          Wire.beginTransmission(0);
           Wire.write("O");
           Wire.write(send_index);
           Wire.write(send_occupancy);
-        control= Wire.endTransmission(true);
-      }
-      control = 1; 
+          Wire.endTransmission();
     }
-    }
-    }
-        Wire.beginTransmission(pi_address);
-        Wire.write("ack");
-        Wire.write('\0');
+        //Wire.beginTransmission(pi_address);
+        //Wire.write("ack");
+        //Wire.write('\0');
+        //Wire.endTransmission();
     break;
 
     case 'O':
@@ -289,15 +280,10 @@ void analyse_request(String data){
     receive_index = data[1] - '0';
     state_occupancy = data[2] - '0';
     occupancy[receive_index] = state_occupancy;
-    
-    break;
-
-    //Save offset values from other desks
-    case 'F':
+    changed_occupancy = 1;
 
     break;
 
-    
     //ANSWER RASPBERRY PI
     char send_desk;
     send_desk = desk_number + '0';
@@ -315,9 +301,9 @@ void analyse_request(String data){
           stream = 2; //streams duty cycle values only
        else
           stream = 3; //streams both lux and duty cycle
-      }      
+      }
       break;
-      
+
       case 'd':
       if(data[1]== 'l'){
         if (stream ==0 || stream ==1)
@@ -330,13 +316,13 @@ void analyse_request(String data){
           stream = 0; //stops all streaming
        else
           stream = 1; //streams lux only
-      }      
+      }
       break;
 
       case 'g':
       if(data[1]== 'l'){ //get lux
       double lux_value = transform_ADC_in_lux(analogRead(LDRPin));
-      dtostrf(lux_value,4,2,temp);  
+      dtostrf(lux_value,4,2,temp);
       while(control !=0){
         Wire.beginTransmission(pi_address);
         Wire.write("l");
@@ -345,7 +331,7 @@ void analyse_request(String data){
         Wire.write('\0');
         control= Wire.endTransmission(true);
       }
-      control = 1;  
+      control = 1;
       }
       else if(data[1]== 'o'){
         send_occupancy = occupancy + '0';
@@ -367,13 +353,13 @@ void analyse_request(String data){
         Wire.write("OK\0");
         control= Wire.endTransmission(true);
       break;
-      
+
    //ANSWER ARDUINO
    case 'E':
       elements[found_elements].endereco= data[1];
       found_elements++;
       break;
-    
+
     case 'C':
       if (data[1]=='S'){
         recolhe_valores=1;
@@ -384,7 +370,7 @@ void analyse_request(String data){
       }
       break;
 
-    case 'A':   
+    case 'A':
       acende = true;
       break;
 
@@ -415,13 +401,13 @@ void streaming(){
     char temp2[6];
     char pwm[6];
     char send_desk;
-   
+
    switch(stream){
     case 1: //streams lux values to raspberry pi
       lux_value = transform_ADC_in_lux(analogRead(LDRPin));
       dtostrf(lux_value,4,2,temp);
       dtostrf(millis(),4,0,temp2);
-      send_desk = desk_number + '0';  
+      send_desk = desk_number + '0';
       while(control !=0){
         Wire.beginTransmission(pi_address);
         Wire.write("cl");
@@ -451,13 +437,13 @@ void streaming(){
       }
       control = 1;
       break;
-    
+
     case 3:
       //First sends lux
       lux_value = transform_ADC_in_lux(analogRead(LDRPin));
       dtostrf(lux_value,4,2,temp);
       dtostrf(millis(),4,0,temp2);
-      send_desk = desk_number + '0';  
+      send_desk = desk_number + '0';
       while(control !=0){
         Wire.beginTransmission(pi_address);
         Wire.write("cl");
@@ -484,9 +470,9 @@ void streaming(){
       }
       control = 1;
       break;
-    
+
  }
-  
+
 }
 
 // ---------------------------- Consensus functions -------------------------------- //
@@ -854,7 +840,7 @@ void broadcast_d(){
     while(d_broadcast_count<found_elements){
         t_0=micros();
         diff=0;
-        while(diff<10){
+        while(diff<100){
             diff=micros()-t_0;
         }
         if (elements[d_broadcast_count].endereco == address){
@@ -943,7 +929,7 @@ void check_occupancy(){
       Lmin[i] = ref_LOW;
     }
     else if(occupancy[i] == 1){
-      Lmin[i] = ref_HIGH;     
+      Lmin[i] = ref_HIGH;
     }
  }
 
@@ -1003,8 +989,8 @@ return outputValue_0;  //Value to write in the led
 void setup() {
 
   int n=0;
-  
-  
+
+
   Serial.begin(9600);
   Serial.println("Begin Setup");
   pinMode(LED_BUILTIN, OUTPUT);
@@ -1015,33 +1001,33 @@ void setup() {
   pinMode(6,INPUT_PULLUP);
   pinMode(7,INPUT_PULLUP);
   pinMode(8,INPUT_PULLUP);
-  
+
   digitalWrite(LED_BUILTIN,HIGH);
   delay(500);
   digitalWrite(LED_BUILTIN,LOW);
 
-  
+
   // Various initialization processes needed (such as reading adress pins, enabling general call, and using builtin led for control purposes)
 
   for (int i=2; i <= 8; i++){
     bitWrite(address, n, !digitalRead(i));
     n++;
   }//reading the address coded in digital ports from 2 to 8
-  
+
   elements[0].endereco=address;  //Saving own address
   Wire.begin(address);  //Initialize I2C comunications
   Wire.onReceive(receiveEvent);
   bitSet(TWAR, TWGCE);  //Enable general call
   delay(100);
-  
+
   propagate_address(address);               //Propagates the address so its know by everyone
-  
+
   t_0=micros();
   while(diff<500000)
   {
     diff=micros()-t_0;
   }
-  
+
   sort_copy(&elements[0],found_elements);   //Sort found addresses for use in calibration
   calibracao(&elements[0],found_elements);  //Calibration
 
@@ -1052,7 +1038,7 @@ void setup() {
          c[i] = 1;           // Unit cost, equal for all luminaires
          Q[i] = 1;           // Unit cost, equal for all luminaires
      }
-      
+
     // CONSENSUS : ADMM auxiliary variables initialization
     for(int i=0; i<found_elements; i++){
         y[i] = 0;
@@ -1066,8 +1052,8 @@ void setup() {
   analogWrite(LedPin,0);
   delay(1000);
   o[my_index] = transform_ADC_in_lux(sampleADC());
-  
-  //Serial.println(o[my_index]);  
+
+  //Serial.println(o[my_index]);
   Serial.println("Setup ended");
   //analogWrite(LedPin,PWM_Calibre);
   t0 = millis();
@@ -1077,7 +1063,7 @@ void setup() {
 void loop() {
 
 check_occupancy();
- 
+
   if(Serial.available()> 0){
     analyse_serial();
   }
@@ -1085,7 +1071,7 @@ check_occupancy();
 if(distributed_control == false){
   if (occupancy[my_index] == 1){
     ff_value = ref_HIGH* feed_gain;
-    Lref = ref_HIGH;  
+    Lref = ref_HIGH;
   }
   else if(occupancy[my_index] == 0){
   ff_value = ref_LOW * feed_gain;
@@ -1102,7 +1088,7 @@ analogWrite(LedPin, pwm);
 else{
 
   if(changed_occupancy){
-  
+
   //CONSENSUS
 
     int iterations = 20;
@@ -1126,16 +1112,20 @@ else{
         // broadcast / receive computed 'd' vectors
         broadcast_d();
     }
-  
+    Serial.println("Finished!");
+    Serial.println("");
+    Serial.println("Lref: \t Lux: \t ff_value: \t pwm:");
+
+
   Lref = compute_Lref();
   ff_value = d[my_index];
   changed_occupancy = 0;
   }
-  
+
   current_lux = transform_ADC_in_lux(sampleADC());
   pwm =  PI_controler(Lref, current_lux, ff_value);
   analogWrite(LedPin, 2.55*pwm);
-  
+
 }
 
 //Serial.println(pwm);
@@ -1144,7 +1134,7 @@ else{
   if(acende==true){
   digitalWrite(LED_BUILTIN,HIGH);
   delay(500);
-  digitalWrite(LED_BUILTIN,LOW);    
+  digitalWrite(LED_BUILTIN,LOW);
   acende = false;
   }
 
@@ -1156,30 +1146,34 @@ else{
   Serial.println(elements[0].ganho);
   Serial.println(elements[1].ganho); */
 
-  
 
 
- 
-  
+
+
+
   if(stream !=0){
     streaming();
   }
 
-  
-  Serial.print(" \n");
-  for (int j=0;j<found_elements;j++){
-    Serial.print("Endereco: ");
-    Serial.print(elements[j].endereco);
-    Serial.print("\t");
-    Serial.print("Ganho: ");
-    Serial.print(elements[j].ganho);
-    Serial.print("\t");
-    Serial.println(j);
-    Serial.println(transform_ADC_in_lux(analogRead(LDRPin)));
-  }
-  
+
+  //Serial.print(" \n");
+  //for (int j=0;j<found_elements;j++){
+    //Serial.print("Endereco: ");
+    //Serial.print(elements[j].endereco);
+    //Serial.print("\t");
+    //Serial.print("Ganho: ");
+    //Serial.print(elements[j].ganho);
+    //Serial.print("\t");
+    //Serial.println(j);
+    //Serial.println(transform_ADC_in_lux(analogRead(LDRPin)));
+  //}
+  Serial.print(Lref);
+  Serial.print('\t');
+  Serial.print(transform_ADC_in_lux(analogRead(LDRPin)));
+  Serial.print('\t');
+  Serial.print(ff_value);
+  Serial.print('\t');
+  Serial.println(pwm);
   delay(T_s);
-  
+
 }
-
-
