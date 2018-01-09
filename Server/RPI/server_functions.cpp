@@ -95,7 +95,7 @@
           return;
         }
         else{
-            async_write(sock_, buffer("\n",1),boost::bind(&socket_connection::handle_KeepAlive, this, _1));
+            socket_connection::send_socket_connection("\n",true);
         }
       }
 
@@ -145,16 +145,31 @@
         socket_connection::start_read_socket_connection();
       }
 
+      void socket_connection::send_socket_connection(std::string msg, bool is_heartbeat){
+        enum {max_length=1024};
+        char error_buffer_[max_length];
+        std::size_t n = msg.size();
+        msg.copy(error_buffer_, n);
+        boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1, is_heartbeat));
+      }
+
+
+
 
       //Function to handle possible errors from sending a message to the client
       //through the socket. If a connection was successfull, the heartbeat
       //timer is reset to avoid sending useless heartbeat messages.
-      void socket_connection::handle_send_socket_connection(const boost::system::error_code& ec){
+      void socket_connection::handle_send_socket_connection(const boost::system::error_code& ec, bool is_heartbeat){
         if (ec){
           printf("Erro a enviar mensagem de erro para o client\n");
         }
         else{
+          if (is_heartbeat){
+            socket_connection::handle_KeepAlive(ec);
+          }
+          else{
             KeepAlive_.expires_from_now(boost::posix_time::seconds(28));
+          }
         }
       }
 
@@ -181,7 +196,7 @@
                           std::size_t n = msg_.size();
                           msg_.copy(error_buffer_, n);
                           //write(sock_, boost::asio::buffer(error_buffer_,n));
-                          boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1));
+                          boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1,false));
                           return false;
                         }
                       }
@@ -190,7 +205,7 @@
                         std::size_t n = msg_.size();
                         msg_.copy(error_buffer_, n);
                         //write(sock_, boost::asio::buffer(error_buffer_,n));
-                        boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1));
+                        boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1,false));
                         return false;
                       }
                       new_line=cmds[0]+' '+cmds[2]+' '+cmds[1];
@@ -208,7 +223,7 @@
                           std::size_t n = msg_.size();
                           msg_.copy(error_buffer_, n);
                           //write(sock_, boost::asio::buffer(error_buffer_,n));
-                          boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1));
+                          boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1,false));
                           return false;
                         }
                         return true;
@@ -218,7 +233,7 @@
                         std::size_t n = msg_.size();
                         msg_.copy(error_buffer_, n);
                         //write(sock_, boost::asio::buffer(error_buffer_,n));
-                        boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1));
+                        boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1,false));
                         return false;
                       }
                     }
@@ -238,7 +253,7 @@
                             std::size_t n = msg_.size();
                             msg_.copy(error_buffer_, n);
                             //write(sock_, boost::asio::buffer(error_buffer_,n));
-                            boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1));
+                            boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1,false));
                             return false;
                           }
                         }
@@ -254,7 +269,7 @@
                           std::size_t n = msg_.size();
                           msg_.copy(error_buffer_, n);
                           //write(sock_, boost::asio::buffer(error_buffer_,n));
-                          boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1));
+                          boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1,false));
                           return false;
                         }
                         return true;
@@ -264,7 +279,7 @@
                         std::size_t n = msg_.size();
                         msg_.copy(error_buffer_, n);
                         //write(sock_, boost::asio::buffer(error_buffer_,n));
-                        boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1));
+                        boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1,false));
                         return false;
                       }
                     }
@@ -273,7 +288,7 @@
                       std::size_t n = msg_.size();
                       msg_.copy(error_buffer_, n);
                       //write(sock_, boost::asio::buffer(error_buffer_,n));
-                      boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1));
+                      boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1,false));
                       return false;
                     }
                 }
@@ -282,7 +297,7 @@
                   std::size_t n = msg_.size();
                   msg_.copy(error_buffer_, n);
                   //write(sock_, boost::asio::buffer(error_buffer_,n));
-                  boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1));
+                  boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1,false));
                   return false;
                 }
               }
@@ -291,7 +306,7 @@
                 std::size_t n = msg_.size();
                 msg_.copy(error_buffer_, n);
                 //write(sock_, boost::asio::buffer(error_buffer_,n));
-                boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1));
+                boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1,false));
                 return false;
               }
           }
@@ -299,7 +314,7 @@
               msg_="\n Client disconnected\n";
               std::size_t n = msg_.size();
               msg_.copy(error_buffer_, n);
-              boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1));
+              boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1,false));
               stop_socket_connection();
               return false;
           }
@@ -309,7 +324,7 @@
           msg_="Server killed\n";
           std::size_t n = msg_.size();
           msg_.copy(error_buffer_, n);
-          boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1));
+          boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1,false));
           kill_server();
           return false;
         }
