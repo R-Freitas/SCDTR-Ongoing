@@ -267,6 +267,10 @@ void analyse_request(String data){
             Wire.write(send_index);
             Wire.write(send_occupancy);
             Wire.endTransmission();
+            if(!distributed_control){
+                Serial.println("");
+                Serial.flush();
+            }
         }
         //Wire.beginTransmission(pi_address);
         //Wire.write("ack");
@@ -282,7 +286,10 @@ void analyse_request(String data){
         occupancy[receive_index] = state_occupancy;
         check_occupancy();
         changed_occupancy = 1;
-
+        if(!distributed_control){
+            Serial.println("");
+            Serial.flush();
+        }
         break;
 
         //ANSWER RASPBERRY PI
@@ -932,7 +939,12 @@ void compute_stats(){
     variance = varianceBuffer/(metricsSampleCounter*T_s*T_s);
 
     // Accumulated energy consumption (since last system restart)
-    energy += d[my_index]*T_s;
+    if(distributed_control){
+        energy += d[my_index]*T_s;
+    }
+    else {
+        energy += pwm*T_s/2.55;
+    }
 }
 
 void check_occupancy(){
@@ -1190,16 +1202,16 @@ void loop() {
         // Serial.print(ff_value);
         // Serial.print('\t');
         // Serial.print("PWM: ");
-        // Serial.println(pwm);
+        Serial.println(pwm);
         // Serial.print(errorBuffer);
         // Serial.print('\t');
-        Serial.print(error);
-        Serial.print('\t');
+        // Serial.print(error);
+        // Serial.print('\t');
         // Serial.print(varianceBuffer);
         // Serial.print('\t');
-        Serial.print(variance);
-        Serial.print('\t');
-        Serial.println(energy);
+        // Serial.print(variance);
+        // Serial.print('\t');
+        // Serial.println(energy);
         }
     else{
         Serial.print(timestamp);
@@ -1213,16 +1225,17 @@ void loop() {
         Serial.print(current_lux);//transform_ADC_in_lux(analogRead(LDRPin)));
         Serial.print('\t');
         // Serial.print("PWM: ");
-        // Serial.print(pwm);
+        Serial.println(pwm);
         // Serial.print(errorBuffer);
         // Serial.print('\t');
-        Serial.print(error);
-        Serial.print('\t');
+        // Serial.print(error);
+        // Serial.print('\t');
         // Serial.print(varianceBuffer);
         // Serial.print('\t');
-        Serial.print(variance);
-        Serial.print('\t');
-        Serial.println(energy);    }
+        // Serial.print(variance);
+        // Serial.print('\t');
+        // Serial.println(energy);
+    }
 
     dt = micros()-t0;
     if(dt>0){
