@@ -193,19 +193,13 @@
                         lexical_cast<int>(cmds[1]);
                         if (ocup!=0 && ocup!=1){
                           msg_="Invalid command:Occupancy command is used as 's <desk_i> <val>'\n";
-                          std::size_t n = msg_.size();
-                          msg_.copy(error_buffer_, n);
-                          //write(sock_, boost::asio::buffer(error_buffer_,n));
-                          boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1,false));
+                          send_socket_connection(msg_, false);
                           return false;
                         }
                       }
                       catch(boost::bad_lexical_cast&){
                         msg_="Invalid command:Occupancy command is used as 's <desk_i> <val>'\n";
-                        std::size_t n = msg_.size();
-                        msg_.copy(error_buffer_, n);
-                        //write(sock_, boost::asio::buffer(error_buffer_,n));
-                        boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1,false));
+                        send_socket_connection(msg_, false);
                         return false;
                       }
                       new_line=cmds[0]+' '+cmds[2]+' '+cmds[1];
@@ -220,20 +214,14 @@
                         }
                         catch(boost::bad_lexical_cast&){
                           msg_="Invalid command:See list provided by the professor\n";
-                          std::size_t n = msg_.size();
-                          msg_.copy(error_buffer_, n);
-                          //write(sock_, boost::asio::buffer(error_buffer_,n));
-                          boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1,false));
+                          send_socket_connection(msg_, false);
                           return false;
                         }
                         return true;
                       }
                       else{
                         msg_="Invalid command:See list provided by the professor\n";
-                        std::size_t n = msg_.size();
-                        msg_.copy(error_buffer_, n);
-                        //write(sock_, boost::asio::buffer(error_buffer_,n));
-                        boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1,false));
+                        send_socket_connection(msg_, false);
                         return false;
                       }
                     }
@@ -250,10 +238,7 @@
                           }
                           else{
                             msg_="Invalid command:See list provided by the professor 2\n";
-                            std::size_t n = msg_.size();
-                            msg_.copy(error_buffer_, n);
-                            //write(sock_, boost::asio::buffer(error_buffer_,n));
-                            boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1,false));
+                            send_socket_connection(msg_, false);
                             return false;
                           }
                         }
@@ -266,55 +251,38 @@
                         }
                         catch(boost::bad_lexical_cast&){
                           msg_="Invalid command:See list provided by the professor\n";
-                          std::size_t n = msg_.size();
-                          msg_.copy(error_buffer_, n);
-                          //write(sock_, boost::asio::buffer(error_buffer_,n));
-                          boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1,false));
+                          send_socket_connection(msg_, false);
                           return false;
                         }
                         return true;
                       }
                       else{
                         msg_="Invalid command:See list provided by the professor\n";
-                        std::size_t n = msg_.size();
-                        msg_.copy(error_buffer_, n);
-                        //write(sock_, boost::asio::buffer(error_buffer_,n));
-                        boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1,false));
+                        send_socket_connection(msg_, false);
                         return false;
                       }
                     }
                     else{
                       msg_="Invalid command:See list provided by the professor\n";
-                      std::size_t n = msg_.size();
-                      msg_.copy(error_buffer_, n);
-                      //write(sock_, boost::asio::buffer(error_buffer_,n));
-                      boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1,false));
+                      send_socket_connection(msg_, false);
                       return false;
                     }
                 }
                 else{
                   msg_="Invalid command: Wrong # of arguments\n";
-                  std::size_t n = msg_.size();
-                  msg_.copy(error_buffer_, n);
-                  //write(sock_, boost::asio::buffer(error_buffer_,n));
-                  boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1,false));
+                  send_socket_connection(msg_, false);
                   return false;
                 }
               }
               else{
                 msg_="Invalid command: Reset not implemented (For now, please use the reset button)\n";
-                std::size_t n = msg_.size();
-                msg_.copy(error_buffer_, n);
-                //write(sock_, boost::asio::buffer(error_buffer_,n));
-                boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1,false));
+                send_socket_connection(msg_, false);
                 return false;
               }
           }
           else{
               msg_="\n Client disconnected\n";
-              std::size_t n = msg_.size();
-              msg_.copy(error_buffer_, n);
-              boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1,false));
+              send_socket_connection(msg_, false);
               stop_socket_connection();
               return false;
           }
@@ -322,9 +290,7 @@
         }
         else{
           msg_="Server killed\n";
-          std::size_t n = msg_.size();
-          msg_.copy(error_buffer_, n);
-          boost::asio::async_write(sock_, boost::asio::buffer(error_buffer_,n),boost::bind(&socket_connection::handle_send_socket_connection, this, _1,false));
+          send_socket_connection(msg_, false);
           kill_server();
           return false;
         }
