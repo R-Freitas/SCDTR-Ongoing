@@ -54,5 +54,4 @@ class server{
     void start_accept();
     void handle_accept(socket_connection* new_socket_connection, const boost::system::error_code& ec);
 
-
 };

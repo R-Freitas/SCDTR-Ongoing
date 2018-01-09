@@ -382,5 +382,4 @@
         eventSetFunc(PI_EVENT_BSC, i2c_handle_read);
         printf("HEY2\n");
       }
-
       */
