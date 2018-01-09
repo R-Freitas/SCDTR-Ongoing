@@ -384,12 +384,12 @@ void analyse_request(String data){
             received_value.toCharArray(buffer,6);
             d_copies[index][i] = atof(buffer);
             // ----------- DEBUG Top ------------ //
-            Serial.print("Received value: d = ");
-            Serial.println(d_copies[index][i]);
-            Serial.flush();
+            // Serial.print("Received value: d = ");
+            // Serial.println(d_copies[index][i]);
+            // Serial.flush();
             // ---------------------------------- //
         }
-        Serial.println("");
+        // Serial.println("");
         d_broadcast_count++;
         break;
     }
@@ -862,24 +862,24 @@ void broadcast_d(){
             control = 1;
             d_broadcast_count++;
             // ----------- DEBUG Top ------------ //
-            for(int i=0; i<found_elements; i++){
-                Serial.print("Sent value: d = ");
-                Serial.println(d[i]);
-            }
-            Serial.println("");
+            // for(int i=0; i<found_elements; i++){
+            //     Serial.print("Sent value: d = ");
+            //     Serial.println(d[i]);
+            // }
+            // Serial.println("");
             // --------------------------------- //
         }
     }
     d_broadcast_count = 0;
     // ----------- DEBUG Top ------------ //
-    Serial.println("d_copies = ");
-    for(int i=0; i<found_elements; i++){
-        for(int j=0; j<found_elements; j++){
-            Serial.print(d_copies[i][j]);
-            Serial.print("\t");
-        }
-        Serial.println("");
-    }
+    // Serial.println("d_copies = ");
+    // for(int i=0; i<found_elements; i++){
+    //     for(int j=0; j<found_elements; j++){
+    //         Serial.print(d_copies[i][j]);
+    //         Serial.print("\t");
+    //     }
+    //     Serial.println("");
+    // }
     // --------------------------------- //
 }
 
@@ -903,11 +903,11 @@ void compute_Lref(){
 
 void compute_stats(){
     metricsSampleCounter++;
-    double Lmeasured = transform_ADC_in_lux(analogRead(LDRPin));
+    double Lmeasured = current_lux;//transform_ADC_in_lux(analogRead(LDRPin));
 
     // Accumulated comfort error (since last system restart)
     double errorCurrent = Lref - Lmeasured;
-    if(error > 0){
+    if(errorCurrent > 0){
         errorBuffer += errorCurrent;
     }
     error = errorBuffer/metricsSampleCounter;
@@ -919,13 +919,18 @@ void compute_stats(){
     else if (metricsSampleCounter==2){
         Li_1 = Lmeasured;
     }
-    else if(metricsSampleCounter>=3){
+    else if (metricsSampleCounter==3){
+        Li = Lmeasured;
+        varianceBuffer += abs(Li - 2*Li_1 + Li_2);
+    }
+    else if(metricsSampleCounter>3){
         Li_2 = Li_1;
         Li_1 = Li;
         Li = Lmeasured;
         varianceBuffer += abs(Li - 2*Li_1 + Li_2);
     }
     variance = varianceBuffer/(metricsSampleCounter*T_s*T_s);
+
     // Accumulated energy consumption (since last system restart)
     energy += d[my_index]*T_s;
 }
@@ -1098,12 +1103,10 @@ void loop() {
             Lref= ref_LOW;
         }
 
-
         current_lux = transform_ADC_in_lux(sampleADC());
-
         pwm =  PI_controler(Lref, current_lux, ff_value);
-
         analogWrite(LedPin, pwm);
+
     }
     else{
 
@@ -1123,11 +1126,11 @@ void loop() {
             for(int i=1; i<=iterations; i++){
 
                 // ----------- DEBUG Top ------------ //
-                Serial.println("\n--------------------------------------------");
-                Serial.print("\t\tIteration: ");
-                Serial.println(i);
-                Serial.println("--------------------------------------------\n");
-                Serial.flush();
+                // Serial.println("\n--------------------------------------------");
+                // Serial.print("\t\tIteration: ");
+                // Serial.println(i);
+                // Serial.println("--------------------------------------------\n");
+                // Serial.flush();
                 // ---------------------------------- //
                 // compute duty-cycles vector, d
                 feedforwardConsensus();
@@ -1140,9 +1143,7 @@ void loop() {
                 // broadcast / receive computed 'd' vectors
                 broadcast_d();
             }
-            Serial.println("");
-            Serial.println("Finished!");
-            Serial.println("");
+            Serial.println("\nFinished consensus!\n");
 
             compute_Lref();
                 // Serial.println("");
@@ -1169,6 +1170,8 @@ void loop() {
         streaming();
     }
 
+    compute_stats();
+
     if(distributed_control){
         Serial.print(timestamp);
         Serial.print('\t');
@@ -1182,13 +1185,22 @@ void loop() {
         // Serial.print('\t');
         // Serial.print("Lux: ");
         Serial.print(current_lux);//transform_ADC_in_lux(analogRead(LDRPin)));
-        // Serial.print('\t');
+        Serial.print('\t');
         // Serial.print("Feedforward: ");
         // Serial.print(ff_value);
-        Serial.print('\t');
+        // Serial.print('\t');
         // Serial.print("PWM: ");
-        Serial.println(pwm);
-    }
+        // Serial.println(pwm);
+        // Serial.print(errorBuffer);
+        // Serial.print('\t');
+        Serial.print(error);
+        Serial.print('\t');
+        // Serial.print(varianceBuffer);
+        // Serial.print('\t');
+        Serial.print(variance);
+        Serial.print('\t');
+        Serial.println(energy);
+        }
     else{
         Serial.print(timestamp);
         Serial.print('\t');
@@ -1201,8 +1213,16 @@ void loop() {
         Serial.print(current_lux);//transform_ADC_in_lux(analogRead(LDRPin)));
         Serial.print('\t');
         // Serial.print("PWM: ");
-        Serial.println(pwm);
-    }
+        // Serial.print(pwm);
+        // Serial.print(errorBuffer);
+        // Serial.print('\t');
+        Serial.print(error);
+        Serial.print('\t');
+        // Serial.print(varianceBuffer);
+        // Serial.print('\t');
+        Serial.print(variance);
+        Serial.print('\t');
+        Serial.println(energy);    }
 
     dt = micros()-t0;
     if(dt>0){
