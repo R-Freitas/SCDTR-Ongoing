@@ -77,7 +77,7 @@ int metricsSampleCounter = 0;
 
 //Others
 bool acende = 0;
-unsigned long t_0,diff,t0, dt; //time variables
+unsigned long t_0,diff,t0, dt, timestamp; //time variables
 float_as_bytes buf[N_ELEMENTS*N_ELEMENTS];
 
 //STATE VARIABLES
@@ -144,11 +144,14 @@ void sort_copy (arduino_info* arr, int size){
 
 double sampleADC(){
     double Value = 0;
+    timestamp = 0;
     for (int k=0;k<10;k++)
     {
         Value += analogRead(LDRPin);
+        timestamp += micros();
     }
     Value /= 10;
+    timestamp /= 10;
     return Value;
 }
 
@@ -527,13 +530,13 @@ void feedforwardConsensus(){
 
     // ---------------------- DEBUG (unconstrained)  ------------------------ //
     //
-    float f_unconstrained = cost_function(d_unconstrained);
-    for(int i=0; i<found_elements; i++){
-        Serial.println(d_unconstrained[i]);
-    }
-    Serial.println(f_unconstrained);
-    Serial.println(" ");
-    Serial.flush();
+    // float f_unconstrained = cost_function(d_unconstrained);
+    // for(int i=0; i<found_elements; i++){
+    //     Serial.println(d_unconstrained[i]);
+    // }
+    // Serial.println(f_unconstrained);
+    // Serial.println(" ");
+    // Serial.flush();
     //
     // ---------------------------------------------------------------------- //
 
@@ -593,13 +596,13 @@ void feedforwardConsensus(){
 
     // ------------------------  DEBUG (linear)  ---------------------------- //
     //
-    f_linear = cost_function(d_linear);
-    for(int i=0; i<found_elements; i++){
-        Serial.println(d_linear[i]);
-    }
-    Serial.println(f_linear);
-    Serial.println(" ");
-    Serial.flush();
+    // f_linear = cost_function(d_linear);
+    // for(int i=0; i<found_elements; i++){
+    //     Serial.println(d_linear[i]);
+    // }
+    // Serial.println(f_linear);
+    // Serial.println(" ");
+    // Serial.flush();
     //
     // ---------------------------------------------------------------------- //
 
@@ -633,13 +636,13 @@ void feedforwardConsensus(){
 
     // -------------------------  DEBUG (dcmin)  ---------------------------- //
     //
-    f_dcmin = cost_function(d_dcmin);
-    for(int i=0; i<found_elements; i++){
-        Serial.println(d_dcmin[i]);
-    }
-    Serial.println(f_dcmin);
-    Serial.println(" ");
-    Serial.flush();
+    // f_dcmin = cost_function(d_dcmin);
+    // for(int i=0; i<found_elements; i++){
+    //     Serial.println(d_dcmin[i]);
+    // }
+    // Serial.println(f_dcmin);
+    // Serial.println(" ");
+    // Serial.flush();
     //
     // ---------------------------------------------------------------------- //
 
@@ -673,13 +676,13 @@ void feedforwardConsensus(){
 
     // -------------------------  DEBUG (dcmax)  ---------------------------- //
     //
-    f_dcmax = cost_function(d_dcmax);
-    for(int i=0; i<found_elements; i++){
-        Serial.println(d_dcmax[i]);
-    }
-    Serial.println(f_dcmax);
-    Serial.println(" ");
-    Serial.flush();
+    // f_dcmax = cost_function(d_dcmax);
+    // for(int i=0; i<found_elements; i++){
+    //     Serial.println(d_dcmax[i]);
+    // }
+    // Serial.println(f_dcmax);
+    // Serial.println(" ");
+    // Serial.flush();
     //
     // ---------------------------------------------------------------------- //
 
@@ -725,13 +728,13 @@ void feedforwardConsensus(){
 
     // ----------------------- DEBUG (linear, dcmin)  ----------------------- //
     //
-    f_linear_dcmin = cost_function(d_linear_dcmin);
-    for(int i=0; i<found_elements; i++){
-        Serial.println(d_linear_dcmin[i]);
-    }
-    Serial.println(f_linear_dcmin);
-    Serial.println(" ");
-    Serial.flush();
+    // f_linear_dcmin = cost_function(d_linear_dcmin);
+    // for(int i=0; i<found_elements; i++){
+    //     Serial.println(d_linear_dcmin[i]);
+    // }
+    // Serial.println(f_linear_dcmin);
+    // Serial.println(" ");
+    // Serial.flush();
     //
     // ---------------------------------------------------------------------- //
 
@@ -764,13 +767,13 @@ void feedforwardConsensus(){
 
     // ----------------------- DEBUG (linear, dcmax)  ----------------------- //
     //
-    f_linear_dcmax = cost_function(d_linear_dcmax);
-    for(int i=0; i<found_elements; i++){
-        Serial.println(d_linear_dcmax[i]);
-    }
-    Serial.println(f_linear_dcmax);
-    Serial.println(" ");
-    Serial.flush();
+    // f_linear_dcmax = cost_function(d_linear_dcmax);
+    // for(int i=0; i<found_elements; i++){
+    //     Serial.println(d_linear_dcmax[i]);
+    // }
+    // Serial.println(f_linear_dcmax);
+    // Serial.println(" ");
+    // Serial.flush();
     //
     // ---------------------------------------------------------------------- //
 
@@ -801,14 +804,14 @@ void compute_d_av(){
         }
         d_av[j] /= found_elements;
         // ----------- DEBUG ------------ //
-        Serial.print("d(");
-        Serial.print(j);
-        Serial.print(") = ");
-        Serial.print(d[j]);
-        Serial.print("\t\t d_av(");
-        Serial.print(j);
-        Serial.print(") = ");
-        Serial.println(d_av[j]);
+        // Serial.print("d(");
+        // Serial.print(j);
+        // Serial.print(") = ");
+        // Serial.print(d[j]);
+        // Serial.print("\t\t d_av(");
+        // Serial.print(j);
+        // Serial.print(") = ");
+        // Serial.println(d_av[j]);
         // ----------------------------- //
     }
     // Serial.println("");
@@ -818,10 +821,10 @@ void update_y(){
     for(int i=0; i<found_elements; i++){
         y[i] += rho*(d[i]-d_av[i]);
         // ----------- DEBUG ------------ //
-        Serial.print("y(");
-        Serial.print(i);
-        Serial.print(") = ");
-        Serial.println(y[i]);
+        // Serial.print("y(");
+        // Serial.print(i);
+        // Serial.print(") = ");
+        // Serial.println(y[i]);
         // ----------------------------- //
     }
     // Serial.println("");
@@ -1167,29 +1170,37 @@ void loop() {
     }
 
     if(distributed_control){
-        Serial.print("Lmin: ");
-        Serial.print(Lmin[my_index]);
+        Serial.print(timestamp);
         Serial.print('\t');
-        Serial.print("Lref: ");
-        Serial.print(Lref);
+        Serial.print(dt);
         Serial.print('\t');
-        Serial.print("Lux: ");
-        Serial.print(transform_ADC_in_lux(analogRead(LDRPin)));
+        // Serial.print("Lmin: ");
+        // Serial.print(Lmin[my_index]);
+        // Serial.print('\t');
+        // Serial.print("Lref: ");
+        // Serial.print(Lref);
+        // Serial.print('\t');
+        // Serial.print("Lux: ");
+        Serial.print(current_lux);//transform_ADC_in_lux(analogRead(LDRPin)));
+        // Serial.print('\t');
+        // Serial.print("Feedforward: ");
+        // Serial.print(ff_value);
         Serial.print('\t');
-        Serial.print("Feedforward: ");
-        Serial.print(ff_value);
-        Serial.print('\t');
-        Serial.print("PWM: ");
+        // Serial.print("PWM: ");
         Serial.println(pwm);
     }
     else{
-        Serial.print("Lref: ");
-        Serial.print(Lref);
+        Serial.print(timestamp);
         Serial.print('\t');
-        Serial.print("Lux: ");
+        Serial.print(dt);
+        Serial.print('\t');
+        // Serial.print("Lref: ");
+        // Serial.print(Lref);
+        // Serial.print('\t');
+        // Serial.print("Lux: ");
         Serial.print(current_lux);//transform_ADC_in_lux(analogRead(LDRPin)));
         Serial.print('\t');
-        Serial.print("PWM: ");
+        // Serial.print("PWM: ");
         Serial.println(pwm);
     }
 
