@@ -1,19 +1,18 @@
 close all, clear all; clc;
-
 %The system
 k11 = 2; k12 = 1; k21 = 1; k22 = 2;
-% k11 = 1.62; k12 = 0.38; k21 = 0.37; k22 = 2.51;
 L1 = 150; o1 = 30; L2 = 80; o2 = 0;
+% k11 = 1.62; k12 = 0.38; k21 = 0.37; k22 = 2.51;
 % L1 = 120; o1 = 0.06; L2 = 70; o2 = 0.06;
 K = [k11, k12 ; k21 , k22];
 L = [L1;L2]; o = [o1;o2];
 
 %The cost functio
-c1 = 1; c2 = 1; q1 = 1; q2 = 1;
+c1 = 1; c2 = 1; q1 = 0.0; q2 = 0.0;
 c = [c1 c2]; Q = [q1 0; 0 q2];
 
 % SOLVE WITH CONSENSUS
-rho = 1.2;
+rho = 0.01;
 %node 1 initialization
 d1 = [0;0];
 d1_av = [0;0];
@@ -27,7 +26,7 @@ d1_copy = [0;0];
 y2 = [0;0];
 k2 = [k21;k22]; 
 %iterations
-iterations = 20;
+iterations = 50;
 for i=1:iterations,
    % node 1
    d11_best = -1;

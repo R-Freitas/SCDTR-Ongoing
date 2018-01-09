@@ -1,8 +1,12 @@
 close all, clear all; clc; format shortg;
 
+
 % SYSTEM / COST FUNCTION 
-k11 = 2; k12 = 1; k21 = 1; k22 = 2;
-L1 = 150; o1 = 30; L2 = 80; o2 = 0;
+% k11 = 2; k12 = 1; k21 = 1; k22 = 2;
+% L1 = 150; o1 = 30; L2 = 80; o2 = 0;
+k11 = 1.77; k12 = 0.37; k21 = 0.40; k22 = 2.61;
+o1 = 0.02; o2 = 0.02;
+L1 = 90; L2 = 90; 
 K = [k11, k12 ; k21 , k22];
 L = [L1;L2]; o = [o1;o2];
 
@@ -13,7 +17,8 @@ c = [c1 c2]; Q = [q1 0; 0 q2];
 %                 SOLVE WITH CONSENSUS
 % ----------------------------------------------------- %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-rho = 0.6;     
+rho = 0.15;
+% rho = 0.01
 % ----------------------------------------------------- %
 %node 1 initialization
 d1 = [0;0];             % d[N_ELEMENTS]
@@ -31,7 +36,7 @@ k2 = [k21;k22];
 % ----------------------------------------------------- %
 
 %iterations
-iterations = 20;
+iterations = 15;
 for i=1:iterations,
   % node 1
    d11_best = -1; % d_best
@@ -422,7 +427,7 @@ end;
 %% Print buffers
 
 % disp('-----------------------------------------------------------');
-% 
+
 % buffer1_u
 % buffer1_l
 % buffer1_b0
@@ -455,37 +460,44 @@ lb = [0;0]; ub = [100;100];
 d = quadprog(Q,c,A,b,[],[],lb,ub);
 l = K*d+o;
 
-% disp('Consensus Solutions')
-% d_ = d2_av
-% l_ = K*d_+o
+disp('Consensus Solutions')
+d_ = d2_av
+l_ = K*d_+o
+
+d_copies
 
 % % PLOTS
 figure(10);
-plot(1:iterations, av1, 1:iterations, av2);
+plot(1:iterations, av1, 1:iterations, av2, 'LineWidth',2);
 grid minor;
 legend('d_1','d_2');
-title(sprintf('Evolution of primal variables (rho = %f)', rho));
+title(sprintf('Evolution of primal variables (rho = %f, L1 = %f, L2 = %f)', rho, L1, L2));
 xlabel('Iteration');
 ylabel('Duty cycle [%]')
+ylim([0,100])
 set(gcf, 'Position', get(0, 'Screensize'));
-% figure(15);
-% t = 0:100;
-% constr1 = (L1-o1)/k12-(k11/k12)*t;
-% constr2 = (L2-o2)/k22-(k21/k22)*t;
-% [x,y]=meshgrid(t,t);
-% hold on;
-% z = c1*x+c2*y+q1*x.^2+q2*y.^2;
-% contour(x,y,z);
-% plot(t,constr1,t,constr2,'LineWidth',2);
-% plot(t,zeros(size(t)),'k','LineWidth',2);
-% plot(zeros(size(t)),t,'k','LineWidth',2);
-% plot(t,100*ones(size(t)),'k','LineWidth',2);
-% plot(100*ones(size(t)),t,'k','LineWidth',2);
-% plot(av1,av2,'--','LineWidth',2);
-% plot(av1,av2,'bo');
-% title('trajectory');
-% xlabel('d_1');
-% ylabel('d_2');
-% plot(d(1),d(2),'r*')
-% axis([-10,110,-10,110]);
-% hold off;
+hold on
+
+figure(15);
+t = 0:100;
+constr1 = (L1-o1)/k12-(k11/k12)*t;
+constr2 = (L2-o2)/k22-(k21/k22)*t;
+[x,y]=meshgrid(t,t);
+hold on;
+z = c1*x+c2*y+q1*x.^2+q2*y.^2;
+contour(x,y,z);
+plot(t,constr1,t,constr2,'LineWidth',2);
+plot(t,zeros(size(t)),'k','LineWidth',2);
+plot(zeros(size(t)),t,'k','LineWidth',2);
+plot(t,100*ones(size(t)),'k','LineWidth',2);
+plot(100*ones(size(t)),t,'k','LineWidth',2);
+plot(av1,av2,'--','LineWidth',2);
+plot(av1,av2,'bo');
+title('trajectory');
+xlabel('d_1');
+ylabel('d_2');
+plot(d(1),d(2),'r*')
+axis([-10,110,-10,110]);
+hold off;
+set(gcf, 'Position', get(0, 'Screensize'));
+
