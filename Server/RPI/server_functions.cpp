@@ -1,5 +1,41 @@
 #include "server_classes.hpp"
 
+  //--------------------Miscelaneous functions------------------------------------
+  //Functions for i2c services
+  void i2c_handle_read (int event, uint32_t tick){
+    int status;
+    status = bscXfer(&xfer);
+    if(xfer.rxCnt !=0)
+    {
+      std::cout<< xfer.rxBuf<< std::endl;
+      std::cout<< "Recebido " << xfer.rxCnt << " bytes" << std::endl;
+    }
+  }
+  void nowhere(){
+
+  }
+  void i2c_read(){
+      for(;;)
+        {
+          bscXfer(&xfer);
+          xfer.txCnt=0;
+          sleep(1);
+          if (stopped_){
+            return;
+          }
+        }
+  }
+  void initialize_i2c(){
+    xfer.control = (0x09<<16) | 0x305;
+    if (gpioInitialise() < 0) { printf("Erro 1\n"); return ;}
+    gpioSetPullUpDown(18, PI_PUD_UP);
+    gpioSetPullUpDown(19, PI_PUD_UP);
+    eventSetFunc(PI_EVENT_BSC, i2c_handle_read);
+  }
+
+
+
+
 
     serial_connection::serial_connection(boost::asio::io_service& io)
     : SPort(io)
@@ -47,11 +83,12 @@
 //Class to manage the connection between client and server.
 //Handles the various assinchronous processes between client and
 //Arduino communication.
-      socket_connection::socket_connection(boost::asio::io_service& io)
+      socket_connection::socket_connection(boost::asio::io_service& io, serial_connection* SPort_received)
         : sock_(io),
-          KeepAlive_(io),
-          SPort(io)
+          KeepAlive_(io)
       {
+        SPort=SPort_received;
+
       }
 
       tcp::socket& socket_connection::socket(){
@@ -62,10 +99,8 @@
       //from the client.
       //Iniciates the various processes
       void socket_connection::start_socket_connection(){
-        stopped_ = false;
         KeepAlive_.expires_from_now(boost::posix_time::seconds(28));
         KeepAlive_.async_wait(boost::bind(&socket_connection::start_KeepAlive, this));
-        SPort.start_serial_connection(ser_port,9600);
         start_read_socket_connection();
       }
 
@@ -141,7 +176,7 @@
             //Check to see if a valid command was used.
             if (is_command_valid(line)){
               boost::erase_all(line, " ");
-              SPort.serial_send(line);
+              SPort->serial_send(line);
             }
           }
         }
@@ -302,16 +337,18 @@
 
 //Class to enclose the various processes used in initializing a server.
 
-      server::server(boost::asio::io_service& io_service, short port)
+      server::server(boost::asio::io_service& io_service, short port, serial_connection* SPort_received)
         : io_service_(io_service),
           acceptor_(io_service, tcp::endpoint(tcp::v4(), port))
+
       {
+        SPort=SPort_received;
         start_accept();
       }
 
 
       void server::start_accept(){
-        socket_connection* new_socket_connection = new socket_connection(io_service_);
+        socket_connection* new_socket_connection = new socket_connection(io_service_, SPort);
         acceptor_.async_accept(new_socket_connection->socket(),
             boost::bind(&server::handle_accept, this, new_socket_connection,
               boost::asio::placeholders::error));
@@ -319,48 +356,12 @@
 
       void server::handle_accept(socket_connection* new_socket_connection, const boost::system::error_code& ec){
         if (!ec){
-          new_socket_connection->start_socket_connection();
           stopped_ = false;
+          new_socket_connection->start_socket_connection();
           std::cout << "New client connected\n";
         }
         else{
           delete new_socket_connection;
         }
         server::start_accept();
-      }
-
-
-
-
-      bsc_xfer_t xfer;
-      //--------------------Miscelaneous functions------------------------------------
-      //Functions for i2c services
-      void i2c_handle_read (int event, uint32_t tick){
-        int status;
-        status = bscXfer(&xfer);
-        if(xfer.rxCnt !=0)
-        {
-          std::cout<< xfer.rxBuf<< std::endl;
-          std::cout<< "Recebido " << xfer.rxCnt << " bytes" << std::endl;
-          std::string msg = xfer.rxBuf;
-
-        }
-      }
-      void i2c_read(){
-          for(;;)
-            {
-              bscXfer(&xfer);
-              xfer.txCnt=0;
-              sleep(600);
-              if (stopped_){
-                return;
-              }
-            }
-      }
-      void initialize_i2c(){
-        xfer.control = (0x09<<16) | 0x305;
-        if (gpioInitialise() < 0) { printf("Erro 1\n"); return ;}
-        gpioSetPullUpDown(18, PI_PUD_UP);
-        gpioSetPullUpDown(19, PI_PUD_UP);
-        eventSetFunc(PI_EVENT_BSC, i2c_handle_read);
       }

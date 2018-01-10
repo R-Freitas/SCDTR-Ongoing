@@ -23,6 +23,8 @@ using namespace boost;
 using namespace boost::asio;
 bool stopped_;
 std::string ser_port="/dev/ttyACM0";
+
+bsc_xfer_t xfer;
 #include "server_functions.cpp"
 #define SCL 19
 #define SDA 18
@@ -39,9 +41,11 @@ int main(int argc, char* argv[]){
     }
 
     boost::asio::io_service io;
+    serial_connection *SPort= new serial_connection(io);
+    SPort->start_serial_connection(ser_port,9600);
     initialize_i2c();
     thread t (i2c_read);
-    server s(io, PORT);
+    server s(io, PORT, SPort);
     io.run();
   }
   catch (std::exception& e){

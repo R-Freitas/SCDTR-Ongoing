@@ -19,9 +19,9 @@ double T_s  = 0.03;
 double T_us = T_s *1000*1000;
 
 //CONTROLER VARIABLES
-float error_0 = 0;     // (k)-th error value [lux]
-float error_1 = 0;     // (k-1)-th error value [lux]
-float outputValue_1 = 0; // (k-1)-th value output to the PWM (analog out)
+float error_0 = 0;         // (k)-th error value [lux]
+float error_1 = 0;        // (k-1)-th error value [lux]
+float outputValue_1 = 0;  // (k-1)-th value output to the PWM (analog out)
 float I = 0;
 float I_1 = 0;
 float D = 0;
@@ -31,8 +31,8 @@ float C = 0;
 float ff_value = 0;
 
 //CONTROLER CONSTANTS
-double Kp = 0.7;
-double Ki = 25;
+double Kp = 0.5;
+double Ki = 20;
 double Kc = 1;
 double Kd = 0;
 int a = 10;
@@ -181,7 +181,6 @@ void calibracao (arduino_info* elements, int found_elements){
             if (recolhe_valores == 1){
                 digitalWrite(LED_BUILTIN,HIGH);
                 elements[calibre_count].ganho = sampleADC();
-                //talvez apenas evocar uma vez, discutir com o duarte ou seja apos o adc meter recolhe_valores=0
             }
             digitalWrite(LED_BUILTIN,LOW);
         }
@@ -262,28 +261,8 @@ void analyse_request(String data){
             check_occupancy();
             changed_occupancy= 1;
             response_data=data;
-
-
-            /*
-            char send_index;
-            char send_occupancy;
-            send_occupancy = new_occupancy + '0';
-            send_index = my_index + '0';
-            Wire.beginTransmission(0);
-            Wire.write("O");
-            Wire.write(send_index);
-            Wire.write(send_occupancy);
-            Wire.endTransmission();
-            if(!distributed_control){
-                Serial.println("");
-                Serial.flush();
-            }
-            */
         }
-        //Wire.beginTransmission(pi_address);
-        //Wire.write("ack");
-        //Wire.write('\0');
-        //Wire.endTransmission();
+
         break;
 
         case 'O':
@@ -301,10 +280,6 @@ void analyse_request(String data){
         break;
 
         //ANSWER RASPBERRY PI
-        char send_desk;
-        send_desk = desk_number + '0';
-        char send_occupancy;
-        char temp[6];
         case 'c': //send stream
         if(data[1]== 'l'){
             if (stream ==0 || stream ==1)
@@ -321,96 +296,59 @@ void analyse_request(String data){
         break;
 
         case 'd':
-        if(data[1]== 'l'){
-            if (stream ==0 || stream ==1)
-            stream = 0; //stops streaming
-            else
-            stream = 2; //streams duty cycle only
-        }
-        else if(data[1]== 'd'){
-            if (stream ==0 || stream == 2)
-            stream = 0; //stops all streaming
-            else
-            stream = 1; //streams lux only
-        }
+          if(data[1]== 'l'){
+              if (stream ==0 || stream ==1)
+              stream = 0; //stops streaming
+              else
+              stream = 2; //streams duty cycle only
+          }
+          else if(data[1]== 'd'){
+              if (stream ==0 || stream == 2)
+              stream = 0; //stops all streaming
+              else
+              stream = 1; //streams lux only
+          }
         break;
 
         case 'g':
-        if(data[1]== 'l'){ //get lux
-            double lux_value = transform_ADC_in_lux(analogRead(LDRPin));
-            dtostrf(lux_value,4,2,temp);
-            while(control !=0){
-                Wire.beginTransmission(pi_address);
-                Wire.write("l");
-                Wire.write(send_desk);
-                Wire.write(temp, sizeof(temp)); //sends 6 bytes: size of array
-                Wire.write('\0');
-                control= Wire.endTransmission(true);
-            }
-            control = 1;
-        }
-        else if(data[1]== 'o'){
-            send_occupancy = occupancy + '0';
-            while(control !=0){
-                Wire.beginTransmission(pi_address);
-                Wire.write("o");
-                Wire.write(send_desk);
-                Wire.write(send_occupancy); //sends 6 bytes: size of array
-                Wire.write('\0');
-                control= Wire.endTransmission(true);
-            }
-            control = 1;
-        }
-
-        break;
-
-        case 't': //test if pi is receiving
-        Wire.beginTransmission(pi_address);
-        Wire.write("OK\0");
-        control= Wire.endTransmission(true);
+          response_data=data;
         break;
 
         //ANSWER ARDUINO
         case 'E':
-        elements[found_elements].endereco= data[1];
-        found_elements++;
+          elements[found_elements].endereco= data[1];
+          found_elements++;
         break;
 
         case 'C':
-        if (data[1]=='S'){
+          if (data[1]=='S'){
             recolhe_valores=1;
-        }
-        if (data[1]=='E'){
+          }
+          if (data[1]=='E'){
             recolhe_valores=0;
             calibre_count++;
-        }
-        break;
-
-        case 'A':
-        acende = true;
+          }
         break;
 
         case 'D':
-        int index = (data[1] - '0') -1; //origin desk number - 1
-
-        char buffer[7];
-        for(int i=0; i<found_elements; i++){
+          int index = (data[1] - '0') -1; //origin desk number - 1
+          char buffer[7];
+          for(int i=0; i<found_elements; i++){
             String received_value = data.substring(i*6+2, i*7+2+5);
             received_value.toCharArray(buffer,6);
             d_copies[index][i] = atof(buffer);
-            // ----------- DEBUG Top ------------ //
-            // Serial.print("Received value: d = ");
-            // Serial.println(d_copies[index][i]);
-            // Serial.flush();
-            // ---------------------------------- //
-        }
-        // Serial.println("");
-        d_broadcast_count++;
+          }
+          d_broadcast_count++;
         break;
     }
 }
 
 void respond_to_request(String data){
+  char send_index;
+  char send_occupancy;
+  int new_occupancy;
+  char temp[6];
+  char send_desk;
 
   switch(data[0]){
     case 's':
@@ -418,10 +356,7 @@ void respond_to_request(String data){
       Wire.write("ack");
       Wire.write('\0');
       Wire.endTransmission();
-      int new_occupancy;
       new_occupancy = data[1] - '0';
-      char send_index;
-      char send_occupancy;
       send_occupancy = new_occupancy + '0';
       send_index = my_index + '0';
       Wire.beginTransmission(0);
@@ -429,6 +364,29 @@ void respond_to_request(String data){
       Wire.write(send_index);
       Wire.write(send_occupancy);
       Wire.endTransmission();
+    break;
+
+    case 'g':
+      send_desk = desk_number + '0';
+      if(data[1]== 'l'){ //get lux
+        double lux_value = transform_ADC_in_lux(analogRead(LDRPin));
+        dtostrf(lux_value,4,2,temp);
+        Wire.beginTransmission(pi_address);
+        Wire.write("l");
+        Wire.write(send_desk);
+        Wire.write(temp, sizeof(temp)); //sends 6 bytes: size of array
+        Wire.write('\0');
+        control= Wire.endTransmission(true);
+      }
+      else if(data[1]== 'o'){
+        send_occupancy = occupancy[my_index] + '0';
+        Wire.beginTransmission(pi_address);
+        Wire.write("o");
+        Wire.write(send_desk);
+        Wire.write(send_occupancy); //sends 6 bytes: size of array
+        Wire.write('\0');
+        Wire.endTransmission(true);
+      }
     break;
   }
 }
@@ -516,6 +474,7 @@ void streaming(){
 
 // ------------------------ Consensus functions ----------------------------- //
 
+// Computes the local_lux from the duty cycle
 float local_lux(float *d){
     float L = o[my_index];    // unconstrained solution illuminance at local desk
     for(int i=0; i<found_elements; i++){
@@ -524,6 +483,7 @@ float local_lux(float *d){
     return L;
 }
 
+// Cost function calculation for the consensus algorithm
 float cost_function(float *d){
     float f = 0;
     f = 0.5*Q[my_index]*d[my_index]*d[my_index]
@@ -565,18 +525,6 @@ void feedforwardConsensus(){
         }
         return;                       // optimal solution - all done!
     }
-
-    // ---------------------- DEBUG (unconstrained)  ------------------------ //
-    //
-    // float f_unconstrained = cost_function(d_unconstrained);
-    // for(int i=0; i<found_elements; i++){
-    //     Serial.println(d_unconstrained[i]);
-    // }
-    // Serial.println(f_unconstrained);
-    // Serial.println(" ");
-    // Serial.flush();
-    //
-    // ---------------------------------------------------------------------- //
 
     // ---------------------------------------------------------------------- //
     //       2) Compute best solution on the boundary - Initialization
@@ -632,18 +580,6 @@ void feedforwardConsensus(){
         }
     }
 
-    // ------------------------  DEBUG (linear)  ---------------------------- //
-    //
-    // f_linear = cost_function(d_linear);
-    // for(int i=0; i<found_elements; i++){
-    //     Serial.println(d_linear[i]);
-    // }
-    // Serial.println(f_linear);
-    // Serial.println(" ");
-    // Serial.flush();
-    //
-    // ---------------------------------------------------------------------- //
-
     // ---------------------------------------------------------------------- //
     //     2.2) Compute best solution on the boundary - dcmin constraint
     // ---------------------------------------------------------------------- //
@@ -671,18 +607,6 @@ void feedforwardConsensus(){
             }
         }
     }
-
-    // -------------------------  DEBUG (dcmin)  ---------------------------- //
-    //
-    // f_dcmin = cost_function(d_dcmin);
-    // for(int i=0; i<found_elements; i++){
-    //     Serial.println(d_dcmin[i]);
-    // }
-    // Serial.println(f_dcmin);
-    // Serial.println(" ");
-    // Serial.flush();
-    //
-    // ---------------------------------------------------------------------- //
 
     // ---------------------------------------------------------------------- //
     //     2.3) Compute best solution on the boundary - dcmax constraint
@@ -712,18 +636,6 @@ void feedforwardConsensus(){
         }
     }
 
-    // -------------------------  DEBUG (dcmax)  ---------------------------- //
-    //
-    // f_dcmax = cost_function(d_dcmax);
-    // for(int i=0; i<found_elements; i++){
-    //     Serial.println(d_dcmax[i]);
-    // }
-    // Serial.println(f_dcmax);
-    // Serial.println(" ");
-    // Serial.flush();
-    //
-    // ---------------------------------------------------------------------- //
-
     // ---------------------------------------------------------------------- //
     // 2.4) Compute best solution on the boundary: linear and dcmin constraints
     // ---------------------------------------------------------------------- //
@@ -747,7 +659,7 @@ void feedforwardConsensus(){
             d_linear_dcmin[i] = z[i]/rho + g*((elements[i].ganho)*(Lmin[my_index]-o[my_index]-v/rho))/rho;
         }
         else if(i==my_index){
-            d_linear_dcmin[i] = z[i]/(Q[i]+rho) - g*(kr2*z[i]/(Q[i]+rho))/rho; // <----- BUG: solved, wrong sign in the handout
+            d_linear_dcmin[i] = z[i]/(Q[i]+rho) - g*(kr2*z[i]/(Q[i]+rho))/rho;
         }
     }
 
@@ -764,18 +676,6 @@ void feedforwardConsensus(){
         }
     }
 
-    // ----------------------- DEBUG (linear, dcmin)  ----------------------- //
-    //
-    // f_linear_dcmin = cost_function(d_linear_dcmin);
-    // for(int i=0; i<found_elements; i++){
-    //     Serial.println(d_linear_dcmin[i]);
-    // }
-    // Serial.println(f_linear_dcmin);
-    // Serial.println(" ");
-    // Serial.flush();
-    //
-    // ---------------------------------------------------------------------- //
-
     // ---------------------------------------------------------------------- //
     // 2.5) Compute best solution on the boundary: linear and dcmax constraints
     // ---------------------------------------------------------------------- //
@@ -786,7 +686,7 @@ void feedforwardConsensus(){
             d_linear_dcmax[i] = d_linear_dcmin[i] - 100*(elements[i].ganho)*(elements[my_index].ganho)*g/rho;
         }
         else if(i==my_index){
-            d_linear_dcmax[i] = d_linear_dcmin[i] + 100*kr2*g/rho;      //  <-- (solved) BUG - faltava multiplicar 100k*r2 por g/rho
+            d_linear_dcmax[i] = d_linear_dcmin[i] + 100*kr2*g/rho;
         }
     }
 
@@ -803,32 +703,17 @@ void feedforwardConsensus(){
         }
     }
 
-    // ----------------------- DEBUG (linear, dcmax)  ----------------------- //
-    //
-    // f_linear_dcmax = cost_function(d_linear_dcmax);
-    // for(int i=0; i<found_elements; i++){
-    //     Serial.println(d_linear_dcmax[i]);
-    // }
-    // Serial.println(f_linear_dcmax);
-    // Serial.println(" ");
-    // Serial.flush();
-    //
-    // ---------------------------------------------------------------------- //
-
     // ---------------------------------------------------------------------- //
     //              2.6) Retrieve best solution on the boundary
     // ---------------------------------------------------------------------- //
 
     for(int i=0; i<found_elements; i++){
         d[i] = d_best[i];
-        //Serial.print("(after feedforwardConsensus() ) d[i] = ");
-        //Serial.println(d[i]);
     }
-
-    // Serial.println(f_best);
     return;
 }
 
+//Compute the duty cycle average
 void compute_d_av(){
     for(int j=0; j<found_elements; j++){
         d_av[j] = 0;
@@ -841,39 +726,22 @@ void compute_d_av(){
             }
         }
         d_av[j] /= found_elements;
-        // ----------- DEBUG ------------ //
-        // Serial.print("d(");
-        // Serial.print(j);
-        // Serial.print(") = ");
-        // Serial.print(d[j]);
-        // Serial.print("\t\t d_av(");
-        // Serial.print(j);
-        // Serial.print(") = ");
-        // Serial.println(d_av[j]);
-        // ----------------------------- //
     }
-    // Serial.println("");
 }
-
+//Compute y
 void update_y(){
     for(int i=0; i<found_elements; i++){
         y[i] += rho*(d[i]-d_av[i]);
-        // ----------- DEBUG ------------ //
-        // Serial.print("y(");
-        // Serial.print(i);
-        // Serial.print(") = ");
-        // Serial.println(y[i]);
-        // ----------------------------- //
     }
-    // Serial.println("");
 }
-
+// Update the d_copies buffer
 void update_d_copies(){
     for(int i=0; i<found_elements; i++){
         d_copies[my_index][i] = d[i];
     }
 }
 
+//Function utilized to broadcast the duty cycle of each luminary
 void broadcast_d(){
 
     while(d_broadcast_count<found_elements){
@@ -899,44 +767,20 @@ void broadcast_d(){
             }
             control = 1;
             d_broadcast_count++;
-            // ----------- DEBUG Top ------------ //
-            // for(int i=0; i<found_elements; i++){
-            //     Serial.print("Sent value: d = ");
-            //     Serial.println(d[i]);
-            // }
-            // Serial.println("");
-            // --------------------------------- //
         }
     }
     d_broadcast_count = 0;
-    // ----------- DEBUG Top ------------ //
-    // Serial.println("d_copies = ");
-    // for(int i=0; i<found_elements; i++){
-    //     for(int j=0; j<found_elements; j++){
-    //         Serial.print(d_copies[i][j]);
-    //         Serial.print("\t");
-    //     }
-    //     Serial.println("");
-    // }
-    // --------------------------------- //
 }
 
 // --------------------------- Other functions ------------------------------ //
-
+//Transform duty cycly value in lux.
 void compute_Lref(){
     Lref = 0;
     for(int i=0; i<found_elements; i++){
         Lref += (elements[i].ganho)*d[i];
-        // Serial.print(elements[i].ganho);
-        // Serial.print('\t');
-        // Serial.print(d[i]);
-        // Serial.print('\t');
-        // Serial.println(Lref);
     }
     Lref += o[my_index];
-    // Serial.print(o[my_index]);
-    // Serial.print('\t');
-    // Serial.println(Lref);
+
 }
 
 void compute_stats(){
@@ -978,6 +822,8 @@ void compute_stats(){
     }
 }
 
+
+//Function that sets the Lmin array according to the ocupancy array
 void check_occupancy(){
     for(int i=0; i<found_elements; i++){
     if(occupancy[i] == 0){
@@ -989,6 +835,8 @@ void check_occupancy(){
 }
 }
 
+
+//Function used to implement the PI controller
 float PI_controler(float Lref, float measured_lux, float ff_value){
 
     float outputValue_0;
@@ -1125,7 +973,7 @@ void setup() {
     Serial.println(o[my_index]);
     Serial.println("");
     Serial.println("-------------------- Setup ended ------------------------\n");
-    //analogWrite(LedPin,PWM_Calibre);
+
 }
 
 void loop() {
@@ -1143,11 +991,11 @@ void loop() {
 
     if(distributed_control == false){
         if (occupancy[my_index] == 1){
-            ff_value = ref_HIGH* feed_gain;
+            ff_value = ref_HIGH* 1/(elements[my_index].ganho*100/PWM_Calibre);
             Lref = ref_HIGH;
         }
         else if(occupancy[my_index] == 0){
-            ff_value = ref_LOW * feed_gain;
+            ff_value = ref_LOW * 1/(elements[my_index].ganho*100/PWM_Calibre);
             Lref= ref_LOW;
         }
 
@@ -1172,14 +1020,6 @@ void loop() {
             // RUN CONSENSUS ALGORITHM
             int iterations = 20;
             for(int i=1; i<=iterations; i++){
-
-                // ----------- DEBUG Top ------------ //
-                // Serial.println("\n--------------------------------------------");
-                // Serial.print("\t\tIteration: ");
-                // Serial.println(i);
-                // Serial.println("--------------------------------------------\n");
-                // Serial.flush();
-                // ---------------------------------- //
                 // compute duty-cycles vector, d
                 feedforwardConsensus();
                 // update duty cycle array, d
@@ -1194,9 +1034,6 @@ void loop() {
             Serial.println("\nFinished consensus!\n");
 
             compute_Lref();
-                // Serial.println("");
-                // Serial.println(Lref);
-                // Serial.println("");
             ff_value = d[my_index];
             changed_occupancy = 0;
         }

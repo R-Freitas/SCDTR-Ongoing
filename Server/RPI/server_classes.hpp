@@ -18,10 +18,10 @@ class socket_connection{
     tcp::socket sock_;
     boost::asio::deadline_timer KeepAlive_;
     boost::asio::streambuf input_buffer_;
-    serial_connection SPort;
     std::string msg_;
+    serial_connection* SPort;
   public:
-    socket_connection(boost::asio::io_service& io);
+    socket_connection(boost::asio::io_service& io, serial_connection* SPort_received);
     tcp::socket& socket();
     void start_socket_connection();
     void stop_socket_connection();
@@ -49,8 +49,9 @@ class server{
   private:
     boost::asio::io_service& io_service_;
     tcp::acceptor acceptor_;
+    serial_connection* SPort;
   public:
-    server(boost::asio::io_service& io_service, short port);
+    server(boost::asio::io_service& io_service, short port, serial_connection* SPort_received);
   private:
     void start_accept();
     void handle_accept(socket_connection* new_socket_connection, const boost::system::error_code& ec);
