@@ -14,7 +14,7 @@
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/lexical_cast.hpp>
-//#include <pigpio.h>
+#include <pigpio.h>
 
 using boost::asio::deadline_timer;
 using boost::asio::ip::tcp;
@@ -22,7 +22,7 @@ using namespace std;
 using namespace boost;
 using namespace boost::asio;
 bool stopped_;
-
+std::string ser_port="/dev/ttyACM0";
 #include "server_functions.cpp"
 
 int main(int argc, char* argv[]){
@@ -36,8 +36,8 @@ int main(int argc, char* argv[]){
     }
 
     boost::asio::io_service io;
-    //initialize_i2c();
-    //thread t (i2c_read);
+    initialize_i2c();
+    thread t (i2c_read);
     server s(io, PORT);
     io.run();
   }

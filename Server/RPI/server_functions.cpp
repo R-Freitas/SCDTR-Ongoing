@@ -4,6 +4,7 @@
     serial_connection::serial_connection(boost::asio::io_service& io)
     : SPort(io)
     {
+      std::cout << "SPort initialized" << "\n";
     }
 
     void serial_connection::start_serial_connection(std::string port, unsigned int baud_rate){
@@ -24,15 +25,16 @@
     void serial_connection::serial_send(std::string line){
       std::string terminated_line;
       std::cout << "Sending: " << line << "\n";
-      terminated_line = line + std::string("\n");
-      std::size_t n = terminated_line.size();
-      terminated_line.copy(send_buffer_, n);
+      //terminated_line = line + std::string("\n");
+      std::size_t n = line.size();
+      line.copy(send_buffer_, n);
       boost::asio::async_write(SPort, boost::asio::buffer(send_buffer_,n),boost::bind(&serial_connection::handle_serial_send, this, _1));
     }
 
 
     //Deals with possible errors from the serial communication.
     void serial_connection::handle_serial_send(const boost::system::error_code& ec){
+      std::cout << "Sent" << "\n";
       if (ec)
       {
         std::cout << "Error on serial communication to Arduino\n";
@@ -63,7 +65,7 @@
         stopped_ = false;
         KeepAlive_.expires_from_now(boost::posix_time::seconds(28));
         KeepAlive_.async_wait(boost::bind(&socket_connection::start_KeepAlive, this));
-        SPort.start_serial_connection("/dev/ttyACM0",9600);
+        SPort.start_serial_connection(ser_port,9600);
         start_read_socket_connection();
       }
 
@@ -138,6 +140,7 @@
           if (!line.empty()){
             //Check to see if a valid command was used.
             if (is_command_valid(line)){
+              boost::erase_all(line, " ");
               SPort.serial_send(line);
             }
           }
@@ -189,20 +192,20 @@
                 if (cmds.size()==3){
                     if (cmds[0].compare("s")== 0){
                       try{
-                        int ocup = lexical_cast<int>(cmds[2]);
-                        lexical_cast<int>(cmds[1]);
+                        int ocup = lexical_cast<int>(cmds[1]);
+                        lexical_cast<int>(cmds[2]);
                         if (ocup!=0 && ocup!=1){
-                          msg_="Invalid command:Occupancy command is used as 's <desk_i> <val>'\n";
+                          msg_="Invalid command:Occupancy command is used as 's <val> <desk_i>'\n";
                           send_socket_connection(msg_, false);
                           return false;
                         }
                       }
                       catch(boost::bad_lexical_cast&){
-                        msg_="Invalid command:Occupancy command is used as 's <desk_i> <val>'\n";
+                        msg_="Invalid command:Occupancy command is used as 's <val> <desk_i>' \n";
                         send_socket_connection(msg_, false);
                         return false;
                       }
-                      new_line=cmds[0]+' '+cmds[2]+' '+cmds[1];
+                      new_line=cmds[0]+' '+cmds[1]+' '+cmds[2];
                       return true;
                     }
 
@@ -327,7 +330,7 @@
       }
 
 
-      /*
+      
       #define SCL 19
       #define SDA 18
       #define ADDRESS 0x09
@@ -363,4 +366,3 @@
         eventSetFunc(PI_EVENT_BSC, i2c_handle_read);
         printf("HEY2\n");
       }
-      */

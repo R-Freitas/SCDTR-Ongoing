@@ -56,6 +56,7 @@ byte control=1;
 int stream =0;
 int desk_number;
 int my_index= -1;
+String response_data="";
 
 //CALIBRATION VARIABLES
 int recolhe_valores=0, calibre_count=0;
@@ -105,28 +106,7 @@ float d_av[N_ELEMENTS];                 // Duty cycles average, for all arduinos
 float d_copies[N_ELEMENTS][N_ELEMENTS]; // Duty cycles buffer, for all arduinos
 
 
-void analyse_serial(){
 
-    String data = "";
-    while(Serial.available()){
-        data += (char) Serial.read();
-    }
-
-    if(sizeof(data)>1){
-        int received_ad = data[2] - '0';
-        if(received_ad == desk_number){
-            analyse_request(data);
-        }
-        else{
-            if(elements[received_ad-1].endereco){ //checks if the desk_number exists
-                int send_to = elements[received_ad-1].endereco;
-                Wire.beginTransmission(send_to);
-                Wire.write(data.c_str());
-                Wire.endTransmission();
-            }
-        }
-    }
-}
 
 void sort_copy (arduino_info* arr, int size){
     for (int k=0; k<(size-1);k++){
@@ -246,6 +226,29 @@ void receiveEvent(int numBytes){
     analyse_request(request);
 }
 
+void analyse_serial(){
+    acende = true;
+    String data = "";
+    while(Serial.available()){
+        data += (char) Serial.read();
+    }
+
+    if(sizeof(data)>1){
+        int received_ad = data[2] - '0';
+        if(received_ad == desk_number){
+            analyse_request(data);
+        }
+        else{
+            if(elements[received_ad-1].endereco){ //checks if the desk_number exists
+                int send_to = elements[received_ad-1].endereco;
+                Wire.beginTransmission(send_to);
+                Wire.write(data.c_str());
+                Wire.endTransmission();
+            }
+        }
+    }
+}
+
 void analyse_request(String data){
 
     switch(data[0]){
@@ -258,6 +261,10 @@ void analyse_request(String data){
             occupancy[my_index] = new_occupancy;
             check_occupancy();
             changed_occupancy= 1;
+            response_data=data;
+
+
+            /*
             char send_index;
             char send_occupancy;
             send_occupancy = new_occupancy + '0';
@@ -271,6 +278,7 @@ void analyse_request(String data){
                 Serial.println("");
                 Serial.flush();
             }
+            */
         }
         //Wire.beginTransmission(pi_address);
         //Wire.write("ack");
@@ -400,6 +408,29 @@ void analyse_request(String data){
         d_broadcast_count++;
         break;
     }
+}
+
+void respond_to_request(String data){
+
+  switch(data[0]){
+    case 's':
+      Wire.beginTransmission(pi_address);
+      Wire.write("ack");
+      Wire.write('\0');
+      Wire.endTransmission();
+      int new_occupancy;
+      new_occupancy = data[1] - '0';
+      char send_index;
+      char send_occupancy;
+      send_occupancy = new_occupancy + '0';
+      send_index = my_index + '0';
+      Wire.beginTransmission(0);
+      Wire.write("O");
+      Wire.write(send_index);
+      Wire.write(send_occupancy);
+      Wire.endTransmission();
+    break;
+  }
 }
 
 void streaming(){
@@ -1104,6 +1135,11 @@ void loop() {
     if(Serial.available()> 0){
         analyse_serial();
     }
+    if (response_data!=""){
+      respond_to_request(response_data);
+      response_data="";
+    }
+
 
     if(distributed_control == false){
         if (occupancy[my_index] == 1){
@@ -1185,10 +1221,10 @@ void loop() {
     compute_stats();
 
     if(distributed_control){
-        Serial.print(timestamp);
-        Serial.print('\t');
-        Serial.print(dt);
-        Serial.print('\t');
+        //Serial.print(timestamp);
+        //Serial.print('\t');
+        //Serial.print(dt);
+        //Serial.print('\t');
         // Serial.print("Lmin: ");
         // Serial.print(Lmin[my_index]);
         // Serial.print('\t');
@@ -1196,13 +1232,13 @@ void loop() {
         // Serial.print(Lref);
         // Serial.print('\t');
         // Serial.print("Lux: ");
-        Serial.print(current_lux);//transform_ADC_in_lux(analogRead(LDRPin)));
-        Serial.print('\t');
+        //Serial.print(current_lux);//transform_ADC_in_lux(analogRead(LDRPin)));
+        //Serial.print('\t');
         // Serial.print("Feedforward: ");
         // Serial.print(ff_value);
         // Serial.print('\t');
         // Serial.print("PWM: ");
-        Serial.println(pwm);
+        //Serial.println(pwm);
         // Serial.print(errorBuffer);
         // Serial.print('\t');
         // Serial.print(error);
@@ -1214,18 +1250,18 @@ void loop() {
         // Serial.println(energy);
         }
     else{
-        Serial.print(timestamp);
-        Serial.print('\t');
-        Serial.print(dt);
-        Serial.print('\t');
+        //Serial.print(timestamp);
+        //Serial.print('\t');
+        //Serial.print(dt);
+        //Serial.print('\t');
         // Serial.print("Lref: ");
         // Serial.print(Lref);
         // Serial.print('\t');
         // Serial.print("Lux: ");
-        Serial.print(current_lux);//transform_ADC_in_lux(analogRead(LDRPin)));
-        Serial.print('\t');
+        //Serial.print(current_lux);//transform_ADC_in_lux(analogRead(LDRPin)));
+        //Serial.print('\t');
         // Serial.print("PWM: ");
-        Serial.println(pwm);
+        //Serial.println(pwm);
         // Serial.print(errorBuffer);
         // Serial.print('\t');
         // Serial.print(error);
