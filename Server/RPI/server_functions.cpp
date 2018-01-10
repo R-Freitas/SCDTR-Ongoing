@@ -330,21 +330,20 @@
       }
 
 
-      
-      #define SCL 19
-      #define SDA 18
-      #define ADDRESS 0x09
+
+
       bsc_xfer_t xfer;
       //--------------------Miscelaneous functions------------------------------------
       //Functions for i2c services
       void i2c_handle_read (int event, uint32_t tick){
         int status;
-        printf("HEY\n");
         status = bscXfer(&xfer);
         if(xfer.rxCnt !=0)
         {
           std::cout<< xfer.rxBuf<< std::endl;
           std::cout<< "Recebido " << xfer.rxCnt << " bytes" << std::endl;
+          std::string msg = xfer.rxBuf;
+
         }
       }
       void i2c_read(){
@@ -364,5 +363,4 @@
         gpioSetPullUpDown(18, PI_PUD_UP);
         gpioSetPullUpDown(19, PI_PUD_UP);
         eventSetFunc(PI_EVENT_BSC, i2c_handle_read);
-        printf("HEY2\n");
       }

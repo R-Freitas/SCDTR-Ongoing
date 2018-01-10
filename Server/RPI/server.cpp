@@ -24,6 +24,9 @@ using namespace boost::asio;
 bool stopped_;
 std::string ser_port="/dev/ttyACM0";
 #include "server_functions.cpp"
+#define SCL 19
+#define SDA 18
+#define ADDRESS 0x09
 
 int main(int argc, char* argv[]){
   int PORT=10000;
